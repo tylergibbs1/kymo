@@ -83,10 +83,15 @@ const spanOf = (
   }
 }
 
+/** The tracks a measured box adds (see `trackRegion`). */
+const BOX_TRACK = /^box\.(x|y|w|h|confidence)$/
+
 const unknownTrack = (name: string, known: ReadonlyArray<string>) =>
   new InvalidInput({
     message: `There is no track "${name}". Tracks: ${known.length > 0 ? known.join(", ") : "none"}.`,
-    hint: `Use one of those names, e.g. ${known[0] ?? "motion"} >= 0 at 0f.`
+    hint: BOX_TRACK.test(name)
+      ? `Measure it: pass box (CLI --box) with the region as it is at the first frame of the range, e.g. --box 120,80,64,64; then ${name} is a track.`
+      : `Use one of those names, e.g. ${known[0] ?? "motion"} >= 0 at 0f.`
   })
 
 /** Evaluate one parsed assertion. Address operands resolve against the Timeline plus the extra markers. */

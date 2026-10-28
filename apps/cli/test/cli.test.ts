@@ -10,10 +10,32 @@ const BIN = resolve(import.meta.dirname, "../bin/kymo.js")
 
 let dir = ""
 let clip = ""
+/** Footage with no tracks of its own: a white 40px square crossing 320x180 black at 60 px/s from x=100. */
+let drift = ""
 
 beforeAll(() => {
   dir = mkdtempSync(join(tmpdir(), "kymo-cli-"))
   clip = join(dir, "clip.mp4")
+  drift = join(dir, "drift.mp4")
+  execFileSync("ffmpeg", [
+    "-nostdin",
+    "-v",
+    "error",
+    "-y",
+    "-f",
+    "lavfi",
+    "-i",
+    "color=c=black:size=320x180:rate=30:duration=3",
+    "-f",
+    "lavfi",
+    "-i",
+    "color=c=white:size=40x40:rate=30:duration=3",
+    "-filter_complex",
+    "[0][1]overlay=x='100+60*t':y=70:shortest=1",
+    "-pix_fmt",
+    "yuv420p",
+    drift
+  ])
   execFileSync("ffmpeg", [
     "-nostdin",
     "-v",
@@ -146,6 +168,40 @@ describe("kymo CLI", () => {
     const lines = jsonLines(r.stdout)
     expect(lines[0]).toMatchObject({ rule: "flicker", address: "01s10f" })
     expect(lines.at(-1)).toMatchObject({ rules: ["flicker", "black-frames"], pass: false })
+  })
+
+  it("check --box measures a region on footage for safe-area and assertions", async () => {
+    const refused = await kymo("check", drift, "--rules", "safe-area")
+    expect(refused.code).toBe(2)
+    const why = JSON.parse(refused.stderr) as Record<string, string>
+    expect(why["hint"]).toMatch(/kymo check \S+ --rules safe-area --box \d+,\d+,\d+,\d+/)
+
+    const noTrack = await kymo("check", drift, "--assert", "box.x <= 170 at 1s")
+    expect(noTrack.code).toBe(2)
+    expect((JSON.parse(noTrack.stderr) as Record<string, string>)["hint"]).toContain("--box")
+
+    const box = ["--box", "100,70,40,40"]
+    const checked = await kymo(
+      "check",
+      drift,
+      ...box,
+      "--rules",
+      "safe-area",
+      "--assert",
+      "box.x <= 170 at 1s"
+    )
+    expect(checked.code, checked.stderr).toBe(0)
+    const lines = jsonLines(checked.stdout)
+    const summary = lines.at(-1)!
+    expect(summary["assertions"]).toMatchObject([{ pass: true }])
+    const actionSafe = lines.slice(0, -1)
+    expect(actionSafe.map((f) => f["rule"])).toEqual(["safe-area"])
+    expect(actionSafe[0]!["message"]).toContain("5% safe area")
+
+    const titleSafe = jsonLines((await kymo("check", drift, ...box, "--safe-margin", "0.1")).stdout)
+    const first = titleSafe.find((f) => f["rule"] === "safe-area")!
+    expect(first["message"]).toContain("10% safe area")
+    expect(first["index"]).toBeLessThan(actionSafe[0]!["index"] as number)
   })
 
   /** One input per JSON Lines command; a new JSON Lines command fails the test below until it has one. */

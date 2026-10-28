@@ -52,6 +52,12 @@ describe("operation contracts", () => {
     })
   )
 
+  it("every numeric input is finite, so it stays a number flag (Schema.Number also admits NaN as text)", () => {
+    for (const op of operations)
+      for (const [key, prop] of Object.entries(flatInputSchema(op).properties))
+        expect(JSON.stringify(prop), `${op.name}.${key}`).not.toContain('"NaN"')
+  })
+
   it("every input flattens to one object schema and every output is an object schema", () => {
     for (const op of operations) {
       expect(flatInputSchema(op).type).toBe("object")

@@ -1,4 +1,4 @@
-import { EasingFit, type FrameRange, fitEasing, parseBox, trackRegion } from "@kymo/analysis"
+import { EasingFit, type FrameRange, fitEasing } from "@kymo/analysis"
 import {
   Address,
   FrameIndex,
@@ -15,6 +15,7 @@ import { BoxText, Format, Range, Source as SourceField, TargetInput } from "../F
 import { analysisRange } from "../Frames.ts"
 import { define } from "../Operation.ts"
 import { OutputDir } from "../OutputDir.ts"
+import { measureBox } from "../Region.ts"
 import { Sheet, sheetOf } from "../Sheets.ts"
 
 const fields = {
@@ -151,10 +152,7 @@ const measure = (input: TrackInput, source: Source, range: FrameRange): Effect.E
         "Pass box=x,y,w,h in source pixels instead, e.g. box=120,80,64,64 (use view=grid in frames to find it)."
       )
     if ("box" in input) {
-      if (timeline.size === null)
-        return yield* invalid(`${timeline.handle} has no pixels to track.`, "Read its own tracks: drop box.")
-      const box = yield* Effect.fromResult(parseBox(input.box, timeline.size))
-      const region = yield* trackRegion(source, range, box)
+      const region = yield* measureBox(source, range, input.box)
       const byProp = { x: region.x, y: region.y, w: region.w, h: region.h, confidence: region.confidence }
       const wanted = (input.props ?? ["x", "y", "confidence"]).map((p) => p.replace(/^box\./, ""))
       const unknown = wanted.filter((p) => !(REGION_PROPS as ReadonlyArray<string>).includes(p))

@@ -12,19 +12,20 @@ import {
   runAssertions,
   scan
 } from "@kymo/analysis"
-import { FramesView, type Marker, type Source, type Track } from "@kymo/core"
+import { FramesView, InvalidInput, type Marker, type Source, type Track } from "@kymo/core"
 import { Workspace } from "@kymo/sources"
 import { Effect, Schema } from "effect"
-import { Range, Source as SourceField } from "../Fields.ts"
+import { BoxText, Range, Source as SourceField } from "../Fields.ts"
 import { analysisRange } from "../Frames.ts"
 import { define, jsonLines } from "../Operation.ts"
+import { exampleBox, findBoxHint, measureBox } from "../Region.ts"
 
 export const CheckInput = Schema.Struct({
   source: SourceField,
   rules: Schema.optionalKey(
     Schema.Array(RuleName).check(Schema.isMinLength(1)).annotate({
       description:
-        "Lint rules to run. Default: every pixel rule (duplicate-frames, dropped-frames, flicker, black-frames), plus safe-area when the source has box.* tracks. non-monotonic runs on request, over the source's tracks."
+        "Lint rules to run. Default: every pixel rule (duplicate-frames, dropped-frames, flicker, black-frames), plus safe-area when there is a box (the box field, or the source's box.* tracks). non-monotonic runs on request, over the source's tracks."
     })
   ),
   assert: Schema.optionalKey(
@@ -32,10 +33,21 @@ export const CheckInput = Schema.Struct({
       .check(Schema.isMinLength(1))
       .annotate({
         description:
-          'Assertions over tracks and markers, e.g. "box.x <= 600 at 1s", "box.opacity >= 0.99 by 500ms", "motion < 0.01 after @impact3", "@impact1 within #15..#25". Tracks: the source\'s own plus motion; markers: the source\'s plus cut1.., peak1...'
+          'Assertions over tracks and markers, e.g. "box.x <= 600 at 1s", "box.opacity >= 0.99 by 500ms", "motion < 0.01 after @impact3", "@impact1 within #15..#25". Tracks: the source\'s own, motion, and box.x/.y/.w/.h when box is given; markers: the source\'s plus cut1.., peak1...'
       })
   ),
-  range: Schema.optionalKey(Range)
+  range: Schema.optionalKey(Range),
+  box: Schema.optionalKey(
+    BoxText.annotate({
+      description:
+        "A region to measure on footage, as it is at the first frame of the range: x,y,w,h in source pixels, e.g. 120,80,64,64 (same as track's box). It is tracked through the range; safe-area checks it, and assertions can use box.x, box.y, box.w and box.h."
+    })
+  ),
+  safeMargin: Schema.optionalKey(
+    Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 0.5, exclusiveMaximum: true })).annotate({
+      description: "Safe-area inset as a fraction of each edge: 0.05 action-safe (default), 0.1 title-safe."
+    })
+  )
 }).annotate({ identifier: "CheckInput" })
 
 /** The next call that shows a finding, ready to send as is. */
@@ -116,12 +128,19 @@ export const check = define({
   name: "check",
   title: "Check rules and assertions",
   description:
-    'Find problems and prove fixes with numbers: lint rules (duplicate or dropped frames, flicker, black frames, safe area, non-monotonic curves) and assertions such as "box.x <= 600 at 1s" or "@impact1 within #15..#25". Each finding names its frames and carries a ready-made kymo_frames call to look at it. Use it after a change to show the change worked; use frames to see a finding.',
+    'Find problems and prove fixes with numbers: lint rules (duplicate or dropped frames, flicker, black frames, safe area, non-monotonic curves) and assertions such as "box.x <= 600 at 1s" or "@impact1 within #15..#25". Each finding names its frames and carries a ready-made kymo_frames call to look at it. On footage, pass box (the region at the first frame of the range) to check safe-area and assert on box.x/.y/.w/.h. Use it after a change to show the change worked; use frames to see a finding.',
   cost: "no images",
   examples: [
     { source: "synthetic:flicker?at=40" },
     { source: "synthetic:bounce?impact=20", assert: ["@impact1 within #18..#22", "box.x <= 600"] },
-    { source: "clips/launch.mp4", rules: ["dropped-frames", "black-frames"], range: "0f..5s" }
+    { source: "clips/launch.mp4", rules: ["dropped-frames", "black-frames"], range: "0f..5s" },
+    {
+      source: "clips/launch.mp4",
+      box: "120,80,64,64",
+      rules: ["safe-area"],
+      safeMargin: 0.1,
+      assert: ["box.x <= 554 at 2s"]
+    }
   ],
   input: CheckInput,
   output: CheckOutput,
@@ -133,14 +152,28 @@ export const check = define({
     const { timeline } = source
     const range = yield* analysisRange(timeline, input.range)
     const own = yield* Effect.forEach(timeline.tracks, (t) => source.track(t.name))
+    const measured = input.box === undefined ? undefined : yield* measureBox(source, range, input.box)
+    const regions = measured === undefined ? groundTruthRegion(source, own, range) : [measured]
+    if (input.rules?.includes("safe-area") && regions.length === 0 && timeline.size !== null)
+      return yield* Effect.fail(
+        new InvalidInput({
+          message: `safe-area needs the box of what must stay inside the frame, and ${timeline.handle} has no box.* tracks.`,
+          hint: `Pass the box as it is at the first frame of the range, e.g. kymo check ${timeline.handle} --rules safe-area --box ${exampleBox(timeline.size)} (MCP: box="${exampleBox(timeline.size)}"); ${findBoxHint(source, range)}.`
+        })
+      )
     const report = yield* runCheck({
       source,
       range,
       ...(input.rules === undefined ? {} : { rules: input.rules }),
+      ...(input.safeMargin === undefined ? {} : { safeMargin: input.safeMargin }),
       tracks: input.rules?.includes("non-monotonic") ? own : [],
-      regions: groundTruthRegion(source, own, range)
+      regions
     })
-    const derived: { tracks: Array<Track>; markers: Array<Marker> } = { tracks: [], markers: [] }
+    const derived: { tracks: Array<Track>; markers: Array<Marker> } = {
+      tracks:
+        measured === undefined ? [] : [measured.x, measured.y, measured.w, measured.h, measured.confidence],
+      markers: []
+    }
     if (input.assert !== undefined && timeline.size !== null) {
       const stats = yield* scan(source, range)
       const cuts = detectCuts(stats)

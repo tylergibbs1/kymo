@@ -80,7 +80,7 @@ export const check = (input: CheckInput): Effect.Effect<CheckReport, KymoError> 
       if (size === null || regions.length === 0) {
         return yield* invalid(
           "safe-area needs a tracked region on a source with pixels.",
-          "Track one first, e.g. track box=120,80,64,64, then check rules=safe-area with that region."
+          "Pass the region as it is at the first frame of the range, e.g. box=120,80,64,64 (CLI: --box 120,80,64,64)."
         )
       }
       findings.push(...safeArea(range, size, margin, regions))
