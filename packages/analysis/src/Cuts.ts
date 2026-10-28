@@ -30,8 +30,9 @@ const SIGMAS = 6
 const BASELINE_RADIUS = 12
 /**
  * ...and changes the coarse picture (the thumbnail) more than this multiple of what nine in ten of the
- * clip's own changes do. Relative, so a title card in a dark screen recording counts as much as a cut
- * between two film shots, and text streaming into a page does not.
+ * clip's ordinary changes do: frames that move but change the tones too little to be cuts. Relative, so a
+ * title card in a dark screen recording counts as much as a cut between two film shots, and text
+ * streaming into a page does not. A slideshow has no ordinary changes, so every cut counts.
  */
 const COARSE_QUANTILE = 0.9
 const COARSE_MARGIN = 1.25
@@ -43,8 +44,13 @@ const FADE_MAX_SECONDS = 2
 const MIX_RESIDUAL = 0.25
 /** The mix moves one way; noise may step it back this much. */
 const MIX_BACKSTEP = 0.15
-/** No single frame carries more than this share of a fade (that would be a hard cut inside it). */
+/**
+ * No single frame carries more than this share of a fade (that would be a hard cut inside it), nor more
+ * than this multiple of an even share: a fade spreads its change over its frames, while a few cuts in a
+ * row hold and jump. The multiple leaves room for easing and for frames repeated by a rate conversion.
+ */
 const MIX_MAX_STEP = 0.5
+const MIX_SPREAD = 4
 /** Mixes this close to an end count as that end. */
 const MIX_END = 0.05
 /**
@@ -67,9 +73,11 @@ interface Found {
 const coarseChange = (scan: Scan): Array<number> =>
   scan.frames.map((f, k) => (k === 0 ? 0 : meanAbsDiff(scan.frames[k - 1]!.thumb, f.thumb)))
 
-/** The coarse change a cut must exceed: well above what this clip's changes usually do. */
-const coarseFloor = (coarse: ReadonlyArray<number>, moving: ReadonlyArray<boolean>): number => {
-  const changes = coarse.filter((_, k) => moving[k]).sort((a, b) => a - b)
+/** The coarse change a cut must exceed: well above what this clip's ordinary changes do. */
+const coarseFloor = (scan: Scan, coarse: ReadonlyArray<number>): number => {
+  const { moving } = signals(scan)
+  const ordinary = (k: number) => moving[k] && (scan.frames[k]!.histDiff ?? 0) < HARD_FLOOR
+  const changes = coarse.filter((_, k) => ordinary(k)).sort((a, b) => a - b)
   return COARSE_MARGIN * (changes[Math.floor(COARSE_QUANTILE * (changes.length - 1))] ?? 0)
 }
 
@@ -131,14 +139,17 @@ const fadeAcross = (
   if (residual > MIX_RESIDUAL * change) return undefined
   let high = 0
   for (let j = 1; j < alphas.length; j++) {
-    if (alphas[j]! < high - MIX_BACKSTEP || alphas[j]! - alphas[j - 1]! > MIX_MAX_STEP) return undefined
+    if (alphas[j]! < high - MIX_BACKSTEP) return undefined
     high = Math.max(high, alphas[j]!)
   }
   let from = 0
   while (from + 1 < alphas.length && alphas[from + 1]! <= MIX_END) from++
   let to = alphas.length - 1
   while (to - 1 > from && alphas[to - 1]! >= 1 - MIX_END) to--
-  return to - from - 1 >= FADE_MIN_FRAMES - 1 ? { from: a + from, to: a + to } : undefined
+  if (to - from < FADE_MIN_FRAMES) return undefined
+  const maxStep = Math.min(MIX_MAX_STEP, MIX_SPREAD / (to - from))
+  for (let j = from + 1; j <= to; j++) if (alphas[j]! - alphas[j - 1]! > maxStep) return undefined
+  return { from: a + from, to: a + to }
 }
 
 /**
@@ -199,7 +210,7 @@ const fades = (scan: Scan, floor: number): Array<Found> => {
  */
 export const detectCuts = (scan: Scan): Cuts => {
   const coarse = coarseChange(scan)
-  const floor = coarseFloor(coarse, signals(scan).moving)
+  const floor = coarseFloor(scan, coarse)
   const found = fades(scan, floor)
   for (const h of hardCuts(scan, coarse, floor)) {
     if (!found.some((x) => h.at > x.from && h.at <= x.to)) found.push(h)

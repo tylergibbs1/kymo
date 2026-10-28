@@ -30,4 +30,17 @@ describe("cuts in a screen recording", () => {
       expect(detectCuts(s).cuts.map((c) => [c.kind, c.marker.index])).toEqual([["hard", 40]])
     })
   )
+
+  it.effect("finds every cut of a slideshow, where nothing moves but the cuts", () =>
+    Effect.gen(function* () {
+      const slide = (n: number): Scene => ({
+        background: [40 + 50 * (n % 4), 60, 200 - 40 * (n % 4)],
+        rects: [{ x: 8 + 9 * n, y: 10, w: 12, h: 20, rgb: [250, 250, 250] }]
+      })
+      const source = fakeSource({ frames: 60, scene: (i) => slide(Math.floor(i / 10)) })
+      const range = yield* FrameRange.whole(source.timeline)
+      const s = yield* scan(source, range)
+      expect(detectCuts(s).cuts.map((c) => c.marker.index)).toEqual([10, 20, 30, 40, 50])
+    })
+  )
 })
