@@ -122,7 +122,18 @@ const register = <R>(spec: ServerSpec<R>) =>
     }
   })
 
-const protocols = [McpProtocol.v2026_07_28, McpProtocol.v2025_11_25] as const
+/**
+ * Every protocol version Effect ships an adapter for, newest first. A client asking for one of these
+ * gets it echoed back; leaving one out makes the server answer with a version the client never
+ * offered, which strict clients treat as a failed handshake.
+ */
+const protocols = [
+  McpProtocol.v2026_07_28,
+  McpProtocol.v2025_11_25,
+  McpProtocol.v2025_06_18,
+  McpProtocol.v2025_03_26,
+  McpProtocol.v2024_11_05
+] as const
 
 /** Logs go to stderr: on stdio, stdout carries the protocol. */
 const logsToStderr = Layer.succeed(Logger.LogToStderr)(true)

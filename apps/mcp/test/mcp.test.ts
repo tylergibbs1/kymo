@@ -3,7 +3,8 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js"
 import { FramesOutput, ProbeOutput } from "kymo"
 import { Schema } from "effect"
-import { spawnSync } from "node:child_process"
+import { McpProtocol } from "effect/ai"
+import { spawn, spawnSync } from "node:child_process"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
@@ -30,6 +31,38 @@ const connect = async (env: Record<string, string> = {}) => {
   await client.connect(transport)
   return client
 }
+
+/**
+ * One `initialize` over raw stdio, without the SDK (which only offers its own latest version), and
+ * the server's JSON-RPC answer.
+ */
+const rawInitialize = (protocolVersion: string): Promise<Record<string, unknown>> =>
+  new Promise((done, fail) => {
+    const cwd = mkdtempSync(join(tmpdir(), "kymo-mcp-"))
+    dirs.push(cwd)
+    const child = spawn(process.execPath, [BIN, "mcp"], { cwd, stdio: ["pipe", "pipe", "pipe"] })
+    let out = ""
+    const timer = setTimeout(() => {
+      child.kill()
+      fail(new Error(`no answer to initialize ${protocolVersion}: ${out}`))
+    }, 20_000)
+    child.stdout.on("data", (d: Buffer) => {
+      out += d.toString()
+      const line = out.split("\n").find((l) => l.trim().length > 0 && out.includes("\n"))
+      if (line === undefined) return
+      clearTimeout(timer)
+      child.stdin.end()
+      child.kill()
+      done(JSON.parse(line) as Record<string, unknown>)
+    })
+    const request = {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "initialize",
+      params: { protocolVersion, capabilities: {}, clientInfo: { name: "raw", version: "0" } }
+    }
+    child.stdin.write(`${JSON.stringify(request)}\n`)
+  })
 
 let client: Client
 
@@ -181,6 +214,23 @@ describe("kymo MCP server", () => {
     expect(text).toContain("**handle**: clip1")
     expect(text).toContain("| address | index |")
     expect(text).toContain("| 01s | 30 |")
+  })
+
+  it("answers initialize with the protocol version the client asked for, when it supports it", async () => {
+    // Every version Effect has an adapter for; 2026-07-28 is stateless and has no initialize.
+    const versions = Object.entries(McpProtocol)
+      .filter(([name]) => /^v\d{4}_\d{2}_\d{2}$/.test(name))
+      .map(([, adapter]) => (adapter as { readonly protocolVersion: string }).protocolVersion)
+      .filter((v) => v !== "2026-07-28")
+    expect(versions).toContain("2025-06-18")
+    for (const asked of versions) {
+      const answer = await rawInitialize(asked)
+      expect(answer, asked).toMatchObject({
+        jsonrpc: "2.0",
+        id: 1,
+        result: { protocolVersion: asked, serverInfo: { name: "kymo" } }
+      })
+    }
   })
 
   it("an invalid switch fails at startup, naming the valid values", () => {
