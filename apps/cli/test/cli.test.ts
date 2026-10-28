@@ -1,5 +1,5 @@
 import { execFileSync, spawn } from "node:child_process"
-import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs"
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { jsonSchema, operations } from "kymo"
@@ -162,12 +162,44 @@ describe("kymo CLI", () => {
     expect(JSON.parse(overridden.stdout)).toMatchObject({ input: "synthetic:cut" })
   })
 
-  it("check prints one line per finding, then the summary", async () => {
+  it("check prints one line per finding, then the summary, and exits 1 when it does not pass", async () => {
     const r = await kymo("check", "synthetic:flicker?at=40", "--rules", "flicker", "black-frames")
-    expect(r.code).toBe(0)
+    expect(r.code, "pass is false: a flicker is an error").toBe(1)
     const lines = jsonLines(r.stdout)
     expect(lines[0]).toMatchObject({ rule: "flicker", address: "01s10f" })
     expect(lines.at(-1)).toMatchObject({ rules: ["flicker", "black-frames"], pass: false })
+  })
+
+  it("check exits 0 when it passes, 1 on a failed assertion, 2 on bad input", async () => {
+    const passed = await kymo("check", "synthetic:bounce?impact=20", "--assert", "@impact1 within #18..#22")
+    expect(passed.code, passed.stderr).toBe(0)
+    const failed = await kymo("check", "synthetic:bounce?impact=20", "--assert", "@impact1 within #0..#5")
+    expect(failed.code).toBe(1)
+    expect(failed.stderr).toBe("")
+    expect(jsonLines(failed.stdout).at(-1)).toMatchObject({ pass: false })
+    const bad = await kymo("check", "synthetic:bounce?impact=20", "--assert", "@impact1 within 8s10")
+    expect(bad.code).toBe(2)
+    expect(bad.stdout).toBe("")
+  })
+
+  it("check with only assertions runs no rules unless --rules asks for them", async () => {
+    const source = "synthetic:flicker?at=40"
+    const asserted = jsonLines((await kymo("check", source, "--assert", "motion >= 0")).stdout)
+    expect(asserted).toHaveLength(1)
+    expect(asserted[0]).toMatchObject({ rules: [], pass: true, counts: { error: 0, warning: 0, info: 0 } })
+    const both = jsonLines(
+      (await kymo("check", source, "--assert", "motion >= 0", "--rules", "flicker")).stdout
+    )
+    expect(both.at(-1)).toMatchObject({ rules: ["flicker"], pass: false })
+  })
+
+  it("a bad --view names view and its values, and nothing else", async () => {
+    const r = await kymo("frames", "synthetic:bounce", "--at", "0f", "--view", "bogus")
+    expect(r.code).toBe(2)
+    const e = JSON.parse(r.stderr) as Record<string, string>
+    expect(e["message"]).toBe(
+      'Invalid frames input: view: expected "sheet" | "onion" | "diff" | "follow" | "grid".'
+    )
   })
 
   it("check --box measures a region on footage for safe-area and assertions", async () => {
@@ -208,7 +240,11 @@ describe("kymo CLI", () => {
   const LINES_INPUTS: Readonly<Record<string, Record<string, unknown>>> = {
     frames: { source: "synthetic:bounce?impact=20", range: "0f..-1f:3f", target: "standard" },
     compare: { a: "synthetic:ease?easing=linear", b: "synthetic:ease?easing=ease-out", at: ["0f", "1s"] },
-    check: { source: "synthetic:dropped?dups=5,50,51,52", assert: ["motion >= 0"] }
+    check: {
+      source: "synthetic:dropped?dups=5,50,51,52",
+      rules: ["duplicate-frames"],
+      assert: ["motion >= 0"]
+    }
   }
 
   it("every JSON Lines command prints lines that decode with the line and summary schemas it publishes", async () => {
@@ -227,6 +263,20 @@ describe("kymo CLI", () => {
       for (const l of lines.slice(0, -1))
         expect(() => Schema.decodeUnknownSync(line)(l, strict)).not.toThrow()
       expect(() => Schema.decodeUnknownSync(summary)(lines.at(-1), strict)).not.toThrow()
+    }
+  })
+
+  it("README and the skill state the stdout contract the commands actually keep", () => {
+    const list = (names: ReadonlyArray<string>) => {
+      const quoted = names.map((n) => `\`${n}\``)
+      return `${quoted.slice(0, -1).join(", ")} and ${quoted.at(-1)}`
+    }
+    const single = [...operations.filter((op) => op.lines === undefined).map((op) => op.name), "schema"]
+    const streamed = operations.filter((op) => op.lines !== undefined).map((op) => op.name)
+    for (const doc of ["README.md", "skills/kymo/SKILL.md"]) {
+      const text = readFileSync(resolve(import.meta.dirname, "../../..", doc), "utf8")
+      expect(text, doc).toContain(`${list(single)} print one JSON value`)
+      expect(text, doc).toContain(`${list(streamed)} print JSON Lines`)
     }
   })
 

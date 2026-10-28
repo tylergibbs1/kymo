@@ -1,9 +1,17 @@
 import { NodeServices } from "@effect/platform-node"
-import { BackendFailure, InvalidInput, type KymoError, exitCodes, toPayload } from "@kymo/core"
+import {
+  BackendFailure,
+  InvalidInput,
+  type KymoError,
+  VERDICT_FAILED_EXIT,
+  exitCodes,
+  toPayload
+} from "@kymo/core"
 import { VERSION, httpServer, stdioServer } from "@kymo/mcp"
 import {
   type AnyOperation,
-  execute,
+  decodeInput,
+  encodeOutput,
   flatInputSchema,
   fromEnv,
   kymoLayer,
@@ -11,12 +19,15 @@ import {
   schemasOf,
   toLines
 } from "kymo"
-import { Cause, Effect, Exit, Fiber, Layer, Logger, Option, Result } from "effect"
+import { Cause, Data, Effect, Exit, Fiber, Layer, Logger, Option, Result } from "effect"
 import { Argument, CliError, CliOutput, Command, Flag } from "effect/cli"
 import { type Field, fieldsOf, inputOf, normalize, paramsOf, valueFlags } from "./Flags.ts"
 import * as Output from "./Output.ts"
 
 const invalid = (message: string, hint: string) => new InvalidInput({ message, hint })
+
+/** The result was printed and is a failure (a check that did not pass): exit `VERDICT_FAILED_EXIT`. */
+class VerdictFailed extends Data.TaggedError("VerdictFailed") {}
 
 const fieldsByOp = new Map(operations.map((op) => [op.name, fieldsOf(flatInputSchema(op))] as const))
 const fieldsFor = (op: AnyOperation): ReadonlyArray<Field> => fieldsByOp.get(op.name)!
@@ -52,16 +63,20 @@ const opCommand = (op: AnyOperation) => {
       const payload = yield* parseJson(values["json"] as Option.Option<string>)
       const raw = { ...payload, ...inputOf(fields, values) }
       const out = Option.getOrUndefined(values["out"] as Option.Option<string>)
-      const result = yield* execute(op, raw).pipe(Effect.provide(kymoLayer({ out })))
-      yield* print(op, result)
+      const output = yield* decodeInput(op, raw).pipe(
+        Effect.flatMap((input) => op.run(input)),
+        Effect.provide(kymoLayer({ out }))
+      )
+      yield* print(op, yield* encodeOutput(op, output))
+      if (op.passed?.(output) === false) return yield* new VerdictFailed()
     })
   ).pipe(
     Command.withDescription(
       `${op.description} Images: ${op.cost}.${
         op.lines === undefined
-          ? ""
+          ? " Prints one JSON value."
           : ` Prints JSON Lines: one of ${op.lines.field} per line, then a summary line (\`kymo schema ${op.name}\` → lines).`
-      }`
+      }${op.passed === undefined ? "" : ` Exits ${VERDICT_FAILED_EXIT} when the result does not pass.`}`
     )
   )
 }
@@ -222,6 +237,7 @@ export const run = (argv: ReadonlyArray<string>): Effect.Effect<number> =>
       const error = Cause.findError(cause)
       if (Result.isSuccess(error)) {
         const e: unknown = error.success
+        if (e instanceof VerdictFailed) return Effect.succeed(VERDICT_FAILED_EXIT)
         if (CliError.isCliError(e)) return report(fromCliError(e))
         if (isKymoError(e)) return report(e)
       }

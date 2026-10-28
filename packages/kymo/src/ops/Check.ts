@@ -25,7 +25,7 @@ export const CheckInput = Schema.Struct({
   rules: Schema.optionalKey(
     Schema.Array(RuleName).check(Schema.isMinLength(1)).annotate({
       description:
-        "Lint rules to run. Default: every pixel rule (duplicate-frames, dropped-frames, flicker, black-frames), plus safe-area when there is a box (the box field, or the source's box.* tracks). non-monotonic runs on request, over the source's tracks."
+        "Lint rules to run. Default without assert: every pixel rule (duplicate-frames, dropped-frames, flicker, black-frames), plus safe-area when there is a box (the box field, or the source's box.* tracks). Default with assert: none, so the verdict is the assertions'. non-monotonic runs on request, over the source's tracks."
     })
   ),
   assert: Schema.optionalKey(
@@ -146,6 +146,7 @@ export const check = define({
   input: CheckInput,
   output: CheckOutput,
   readOnly: true,
+  passed: (output) => output.pass,
   lines: jsonLines(CheckOutput, "findings"),
   run: Effect.fn("kymo.check")(function* (input: typeof CheckInput.Type) {
     const workspace = yield* Workspace
@@ -162,10 +163,12 @@ export const check = define({
           hint: `Pass the box as it is at the first frame of the range, e.g. kymo check ${timeline.handle} --rules safe-area --box ${exampleBox(timeline.size)} (MCP: box="${exampleBox(timeline.size)}"); ${findBoxHint(source, range)}.`
         })
       )
+    // Assertions alone ask one question; running every default rule too would bury its answer.
+    const rules = input.rules ?? (input.assert === undefined ? undefined : [])
     const report = yield* runCheck({
       source,
       range,
-      ...(input.rules === undefined ? {} : { rules: input.rules }),
+      ...(rules === undefined ? {} : { rules }),
       ...(input.safeMargin === undefined ? {} : { safeMargin: input.safeMargin }),
       tracks: input.rules?.includes("non-monotonic") ? own : [],
       regions

@@ -30,6 +30,12 @@ export const KymoError = Schema.Union([
 export type KymoError = typeof KymoError.Type
 
 /**
+ * CLI exit code when a command ran and printed its result, but the result is a failure: a check
+ * with `pass: false`. Errors use 2 and above (`exitCodes`), so 1 always means "the answer is no".
+ */
+export const VERDICT_FAILED_EXIT = 1
+
+/**
  * CLI exit code per error tag. Typed as a total record, so adding an error
  * without choosing its exit code is a compile error.
  */

@@ -1,6 +1,6 @@
 import { BackendFailure, InvalidInput, type KymoError } from "@kymo/core"
 import type { Workspace } from "@kymo/sources"
-import { Effect, Schema } from "effect"
+import { Effect, Result, Schema } from "effect"
 import type { FrameLabels } from "./FrameLabels.ts"
 import type { OutputDir } from "./OutputDir.ts"
 import type { Sheet } from "./Sheets.ts"
@@ -73,6 +73,11 @@ export interface Operation<
   readonly lines?: JsonLines
   /** The images a result carries, in order, for shells that attach them (MCP). */
   images?(output: O["Type"]): ReadonlyArray<Sheet>
+  /**
+   * For operations that give a verdict (check): false when the result is a failure. The CLI still
+   * prints the result and then exits with `VERDICT_FAILED_EXIT` instead of 0.
+   */
+  passed?(output: O["Type"]): boolean
   run(input: I["Type"]): Effect.Effect<O["Type"], KymoError, KymoServices>
 }
 
@@ -104,6 +109,26 @@ const formatIssues = (message: string): string => {
   return issues.join("; ")
 }
 
+/** The shapes an input can take: the members of a union (`at` or `range`), or the one schema. */
+const shapesOf = (input: Codec<unknown>): ReadonlyArray<Codec<unknown>> =>
+  "members" in input && Array.isArray(input.members)
+    ? (input.members as ReadonlyArray<Codec<unknown>>)
+    : [input]
+
+/**
+ * The issues of the shape the input comes closest to. Reporting every shape's issues would blame
+ * fields the caller never meant (`at: is not a field` for a bad `view`), so only the best one is told.
+ */
+const closestIssues = (input: Codec<unknown>, raw: unknown): string => {
+  const candidates = shapesOf(input).flatMap((shape) => {
+    const result = Schema.decodeUnknownResult(shape)(raw, parseOptions)
+    return Result.isFailure(result) ? [formatIssues(result.failure.message)] : []
+  })
+  return candidates.reduce((best, issues) =>
+    issues.split("; ").length < best.split("; ").length ? issues : best
+  )
+}
+
 /** Decode raw input (CLI `--json`, flags, MCP arguments, library calls) with the operation's Schema. */
 export const decodeInput = <I extends Codec<unknown>, O extends Codec<unknown>>(
   op: Operation<I, O>,
@@ -111,9 +136,9 @@ export const decodeInput = <I extends Codec<unknown>, O extends Codec<unknown>>(
 ): Effect.Effect<I["Type"], InvalidInput> =>
   Schema.decodeUnknownEffect(op.input)(raw, parseOptions).pipe(
     Effect.mapError(
-      (error) =>
+      () =>
         new InvalidInput({
-          message: `Invalid ${op.name} input: ${formatIssues(error.message)}.`,
+          message: `Invalid ${op.name} input: ${closestIssues(op.input, raw)}.`,
           hint: `Run \`kymo schema ${op.name}\` for every field. Example: ${JSON.stringify(op.examples[0] ?? {})}`
         })
     )
