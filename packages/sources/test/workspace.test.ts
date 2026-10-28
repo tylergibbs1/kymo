@@ -105,6 +105,52 @@ describe("Workspace", () => {
     }).pipe(Effect.provide(workspaceAt(tempRoot())))
   )
 
+  it.effect("detected markers keep their names by frame; new ones get the next number of their kind", () =>
+    Effect.gen(function* () {
+      const ws = yield* Workspace
+      yield* ws.register("synthetic:bounce")
+      const first = yield* ws.saveDetected("clip1", [
+        { kind: "cut", index: 10 },
+        { kind: "cut", index: 20 },
+        { kind: "peak", index: 15 }
+      ])
+      assert.deepStrictEqual(first, ["cut1", "cut2", "peak1"])
+      const second = yield* ws.saveDetected("clip1", [
+        { kind: "cut", index: 5 },
+        { kind: "cut", index: 20 },
+        { kind: "peak", index: 30 }
+      ])
+      assert.deepStrictEqual(second, ["cut3", "cut2", "peak2"])
+      const saved = (yield* ws.list)[0]!.markers.map((m): ReadonlyArray<unknown> => [
+        m.name,
+        m.index,
+        m.origin
+      ])
+      assert.deepStrictEqual(saved, [
+        ["cut1", 10, "cut"],
+        ["cut2", 20, "cut"],
+        ["peak1", 15, "peak"],
+        ["cut3", 5, "cut"],
+        ["peak2", 30, "peak"]
+      ])
+    }).pipe(Effect.provide(workspaceAt(tempRoot())))
+  )
+
+  it.effect("a taken handle is not rebound to another input unless replace is asked for", () =>
+    Effect.gen(function* () {
+      const ws = yield* Workspace
+      yield* ws.register("synthetic:bounce", "hero")
+      yield* ws.addMarker("hero", "hit", 12)
+      assert.strictEqual(yield* ws.register("synthetic:bounce", "hero"), "hero")
+      const error = yield* Effect.flip(ws.register("synthetic:cut", "hero"))
+      assert.strictEqual(error._tag, "InvalidInput")
+      assert.deepStrictEqual(yield* ws.resolve("hero"), { handle: "hero", input: "synthetic:bounce" })
+      yield* ws.register("synthetic:cut", "hero", { replace: true })
+      const [entry] = yield* ws.list
+      assert.deepStrictEqual([entry!.input, entry!.markers], ["synthetic:cut", []])
+    }).pipe(Effect.provide(workspaceAt(tempRoot())))
+  )
+
   it.effect("a bad input is not remembered", () =>
     Effect.gen(function* () {
       const ws = yield* Workspace

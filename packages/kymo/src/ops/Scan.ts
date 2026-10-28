@@ -20,6 +20,7 @@ import { FrameLabels } from "../FrameLabels.ts"
 import { define } from "../Operation.ts"
 import { OutputDir } from "../OutputDir.ts"
 import { Sheet, SheetFrame, toSheets, truncationNote } from "../Sheets.ts"
+import { saveScanMarkers } from "../WorkspaceMarkers.ts"
 
 export const ScanInput = Schema.Struct({
   source: Source,
@@ -153,8 +154,8 @@ export const scan = define({
     const { timeline } = source
     const range = yield* analysisRange(timeline, input.range)
     const stats = yield* scanFrames(source, range)
-    const cuts = detectCuts(stats)
-    const motion = motionEnergy(stats, cuts)
+    const detected = detectCuts(stats)
+    const { cuts, motion } = yield* saveScanMarkers(timeline.handle, detected, motionEnergy(stats, detected))
     const picked =
       input.sample === "motion"
         ? sample({ strategy: "motion", scan: stats, cuts, budget: input.budget })
@@ -169,8 +170,6 @@ export const scan = define({
       labelStyle: style,
       cursor: input.cursor
     })
-    for (const m of [...cuts.cuts.map((c) => c.marker), ...motion.peaks.map((p) => p.marker)])
-      yield* workspace.addMarker(timeline.handle, m.name, m.index)
     const suggestions = suggest(range, motion, cuts)
     const detailed = input.format === "detailed"
     const focus = suggestions[0]?.range ?? range.spanText(range.first, range.last)

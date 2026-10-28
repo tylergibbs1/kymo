@@ -1,7 +1,7 @@
 import { Timeline } from "@kymo/core"
 import { Workspace } from "@kymo/sources"
 import { Effect, Schema } from "effect"
-import { As } from "../Fields.ts"
+import { As, Replace } from "../Fields.ts"
 import { define } from "../Operation.ts"
 
 export const OpenInput = Schema.Struct({
@@ -9,6 +9,7 @@ export const OpenInput = Schema.Struct({
     description: "A video path, a directory of numbered images, or a synthetic:<scene>?… spec."
   }),
   as: Schema.optionalKey(As),
+  replace: Schema.optionalKey(Replace),
   offset: Schema.optionalKey(
     Schema.Int.annotate({ description: "Frames to shift this source by when aligning it with others." })
   )
@@ -33,7 +34,7 @@ export const open = define({
   readOnly: false,
   run: Effect.fn("kymo.open")(function* (input: typeof OpenInput.Type) {
     const workspace = yield* Workspace
-    const handle = yield* workspace.register(input.src, input.as)
+    const handle = yield* workspace.register(input.src, input.as, { replace: input.replace === true })
     if (input.offset !== undefined) yield* workspace.setOffset(handle, input.offset)
     const source = yield* workspace.open(handle)
     return { handle, input: input.src, offset: input.offset ?? 0, timeline: source.timeline }

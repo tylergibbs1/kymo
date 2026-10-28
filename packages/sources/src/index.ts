@@ -3,4 +3,12 @@ export { DEFAULT_SEQUENCE_FPS, ImageSeqAdapter } from "./image-seq/ImageSeqAdapt
 export { type AdapterKey, Sources } from "./Sources.ts"
 export { SyntheticAdapter } from "./synthetic/SyntheticAdapter.ts"
 export { VideoAdapter } from "./video/VideoAdapter.ts"
-export { type AgentMarker, Handle, type Resolved, Workspace, WorkspaceEntry } from "./Workspace.ts"
+export {
+  type AgentMarker,
+  type Detected,
+  Handle,
+  type RegisterOptions,
+  type Resolved,
+  Workspace,
+  WorkspaceEntry
+} from "./Workspace.ts"

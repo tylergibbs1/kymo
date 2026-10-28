@@ -1,10 +1,14 @@
 import { Timeline } from "@kymo/core"
 import { Workspace } from "@kymo/sources"
 import { Effect, Schema } from "effect"
-import { As, Source } from "../Fields.ts"
+import { As, Replace, Source } from "../Fields.ts"
 import { define } from "../Operation.ts"
 
-export const ProbeInput = Schema.Struct({ source: Source, as: Schema.optionalKey(As) }).annotate({
+export const ProbeInput = Schema.Struct({
+  source: Source,
+  as: Schema.optionalKey(As),
+  replace: Schema.optionalKey(Replace)
+}).annotate({
   identifier: "ProbeInput"
 })
 
@@ -31,8 +35,10 @@ export const probe = define({
     const workspace = yield* Workspace
     const source = yield* workspace.open(input.source)
     if (input.as === undefined) return source.timeline
-    // Name what the source resolved to, so an existing handle can be renamed as well as a path named.
-    const handle = yield* workspace.register(source.timeline.input, input.as)
+    // Name the input as the workspace records it (not the Timeline's normalised form), so an existing
+    // handle can be renamed as well as a path named, and naming a source as itself changes nothing.
+    const { input: recorded } = yield* workspace.resolve(input.source)
+    const handle = yield* workspace.register(recorded, input.as, { replace: input.replace === true })
     return (yield* workspace.open(handle)).timeline
   }, Effect.scoped)
 })

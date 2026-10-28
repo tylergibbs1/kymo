@@ -2,6 +2,7 @@ import { NodeServices } from "@effect/platform-node"
 import {
   BackendFailure,
   FrameIndex,
+  frameIndex,
   InvalidInput,
   type KymoError,
   MarkerName,
@@ -20,8 +21,22 @@ export const Handle = Schema.String.check(
 ).pipe(Schema.brand("Handle"))
 export type Handle = typeof Handle.Type
 
-const AgentMarker = Schema.Struct({ name: MarkerName, index: FrameIndex })
+/** Where a saved marker came from: set by the agent, or found by scan. */
+const SavedOrigin = Schema.Literals(["agent", "cut", "peak"])
+
+const AgentMarker = Schema.Struct({
+  name: MarkerName,
+  index: FrameIndex,
+  /** Absent in files written before scan saved its own kind; those read as "agent". */
+  origin: Schema.optionalKey(SavedOrigin)
+})
 export type AgentMarker = typeof AgentMarker.Type
+
+/** A marker scan found: its kind names it (`cut3`, `peak1`), its frame identifies it. */
+export interface Detected {
+  readonly kind: "cut" | "peak"
+  readonly index: number
+}
 
 /** One remembered source. */
 export const WorkspaceEntry = Schema.Struct({
@@ -39,6 +54,11 @@ type WorkspaceFile = typeof WorkspaceFile.Type
 const decodeFile = Schema.decodeUnknownResult(Schema.fromJsonString(WorkspaceFile))
 const EMPTY: WorkspaceFile = { version: 1, sources: [] }
 
+export interface RegisterOptions {
+  /** Point an existing handle at a different input, dropping its markers and offset. */
+  readonly replace?: boolean
+}
+
 export interface Resolved {
   readonly handle: Handle
   readonly input: string
@@ -48,8 +68,12 @@ export interface Resolved {
 export class Workspace extends Context.Service<
   Workspace,
   {
-    /** Name `input`. Reuses its existing handle, or picks `clip1`, `clip2`, … unless `as` is given. */
-    register(input: string, as?: string): Effect.Effect<Handle, KymoError>
+    /**
+     * Name `input`. Reuses its existing handle, or picks `clip1`, `clip2`, … unless `as` is given.
+     * A handle already naming another input fails with InvalidInput unless `replace` is set, so a
+     * source and its saved markers are never lost by reusing a name.
+     */
+    register(input: string, as?: string, options?: RegisterOptions): Effect.Effect<Handle, KymoError>
     readonly list: Effect.Effect<ReadonlyArray<WorkspaceEntry>, KymoError>
     /** A known handle → its input. Otherwise a path, URL or spec, under its existing or next auto handle. */
     resolve(sourceOrHandle: string): Effect.Effect<Resolved, KymoError>
@@ -58,6 +82,16 @@ export class Workspace extends Context.Service<
     setOffset(handle: string, frames: number): Effect.Effect<void, KymoError>
     /** Set (or move) an agent marker. The index must already be resolved against the source. */
     addMarker(handle: string, name: string, index: number): Effect.Effect<void, KymoError>
+    /**
+     * Save what a scan found and return each one's name, in order. A marker is identified by its
+     * kind and frame: one already saved keeps its name, a new one gets the next number after every
+     * saved one of its kind. Saved markers are never renamed, moved or dropped, so `@cut4` names the
+     * same frame after any later scan, ranged or not.
+     */
+    saveDetected(
+      handle: string,
+      found: ReadonlyArray<Detected>
+    ): Effect.Effect<ReadonlyArray<string>, KymoError>
   }
 >()("@kymo/sources/Workspace") {
   /** A workspace whose state lives in `<root>/.kymo/handles.json`. */
@@ -142,12 +176,16 @@ const make = Effect.fnUntraced(function* (root: string) {
     return entry ? Effect.succeed(entry) : Effect.fail(notFound(state, handle))
   }
 
-  const nextAutoHandle = (state: WorkspaceFile): Handle => {
+  /** `prefix1`, `prefix2`, … : the first one no source has. */
+  const freeName = (state: WorkspaceFile, prefix: string): Handle => {
     const taken = new Set<string>(state.sources.map((s) => s.handle))
-    let n = 1
-    while (taken.has(`clip${n}`)) n++
-    return Handle.make(`clip${n}`)
+    const stem = prefix.replace(/\d+$/, "")
+    let n = stem === prefix ? 1 : 2
+    while (taken.has(`${stem}${n}`)) n++
+    return Handle.make(`${stem}${n}`)
   }
+
+  const nextAutoHandle = (state: WorkspaceFile): Handle => freeName(state, "clip")
 
   const resolveIn = (state: WorkspaceFile, ref: string) =>
     Effect.gen(function* () {
@@ -169,7 +207,7 @@ const make = Effect.fnUntraced(function* (root: string) {
     }
   }
 
-  const register = (input: string, as?: string) =>
+  const register = (input: string, as?: string, options?: RegisterOptions) =>
     update((state) =>
       Effect.gen(function* () {
         if (as === undefined) {
@@ -181,6 +219,13 @@ const make = Effect.fnUntraced(function* (root: string) {
         const handle = yield* parseHandle(as)
         const current = state.sources.find((s) => s.handle === handle)
         if (current?.input === input) return [handle, state] as const
+        if (current !== undefined && options?.replace !== true) {
+          const saved = current.markers.length
+          return yield* invalid(
+            `${handle} already names ${current.input}${saved > 0 ? ` (with ${saved} saved marker${saved === 1 ? "" : "s"})` : ""}; it was not changed to ${input}.`,
+            `Choose another name, e.g. ${freeName(state, handle)}, or pass replace (CLI --replace) to point ${handle} at ${input} and drop its markers.`
+          )
+        }
         return [handle, withEntry(state, { handle, input, offset: 0, markers: [] })] as const
       })
     )
@@ -191,7 +236,7 @@ const make = Effect.fnUntraced(function* (root: string) {
         const { handle, input, entry } = yield* resolveIn(state, ref)
         const source = yield* sources.open(input, handle)
         const agent = (entry?.markers ?? []).map((m) =>
-          makeMarker(source.timeline.rate, m.name, m.index, "agent")
+          makeMarker(source.timeline.rate, m.name, m.index, m.origin ?? "agent")
         )
         const names = new Set(agent.map((m) => m.name))
         const opened: Source = {
@@ -237,8 +282,31 @@ const make = Effect.fnUntraced(function* (root: string) {
       })
     )
 
+  const saveDetected = (handle: string, found: ReadonlyArray<Detected>) =>
+    update((state) =>
+      Effect.gen(function* () {
+        const entry = yield* entryFor(state, handle)
+        const markers = [...entry.markers]
+        const numberOf = (kind: string, name: string) => {
+          const m = new RegExp(`^${kind}(\\d+)$`).exec(name)
+          return m ? Number(m[1]) : 0
+        }
+        const names = found.map(({ kind, index }) => {
+          const same = markers.find((m) => numberOf(kind, m.name) > 0 && m.index === index)
+          if (same) return same.name
+          const next = Math.max(0, ...markers.map((m) => numberOf(kind, m.name))) + 1
+          const marker = { name: `${kind}${next}`, index: frameIndex(index), origin: kind }
+          markers.push(marker)
+          return marker.name
+        })
+        const changed = markers.length !== entry.markers.length
+        return [names, changed ? withEntry(state, { ...entry, markers }) : state] as const
+      })
+    )
+
   return Workspace.of({
     register,
+    saveDetected,
     list: Effect.map(load, (s) => s.sources),
     resolve: (ref) =>
       Effect.map(
