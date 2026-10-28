@@ -119,7 +119,8 @@ const groundTruthRegion = (source: Source, tracks: ReadonlyArray<Track>, range: 
       name: "box.confidence",
       unit: "0..1",
       samples: x.samples.map((v) => (v === null ? null : 1))
-    }
+    },
+    lost: []
   }
   return [region]
 }

@@ -58,7 +58,8 @@ describe("oracle tracking strategies", () => {
                 method: "template",
                 tracks: [truth.x, truth.y, truth.w, truth.h].map(series),
                 plot: null,
-                easing: []
+                easing: [],
+                lost: []
               })
             })
           }

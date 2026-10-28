@@ -33,6 +33,14 @@ export const parseBox = (text: string, size: Size): Result.Result<Box, InvalidIn
   return Result.succeed({ x, y, w, h })
 }
 
+/** Why a run of frames has no position: the match was poor, or the box ran into the frame edge. */
+export const LostReason = Schema.Literals(["low-confidence", "edge"])
+export type LostReason = typeof LostReason.Type
+
+/** Consecutive frames where the region was lost, for the same reason as its first frame. */
+export const LostSpan = Schema.Struct({ from: FrameRef, to: FrameRef, reason: LostReason })
+export type LostSpan = typeof LostSpan.Type
+
 /**
  * A region followed over time, as four px Tracks named `<name>.x`, `.y`, `.w`, `.h`.
  * Template matching and (later) DOM selectors both produce this shape.
@@ -48,7 +56,9 @@ export const RegionTrack = Schema.Struct({
   w: Track,
   h: Track,
   /** Match quality per frame, 0..1. Position samples are null where the region was lost. */
-  confidence: Track
+  confidence: Track,
+  /** Where position samples are null, and why; in frame order. */
+  lost: Schema.Array(LostSpan)
 })
 export type RegionTrack = typeof RegionTrack.Type
 
@@ -190,10 +200,13 @@ const match = (g: Gray, s: State, baseRadius: number) => {
   const ring = ringMean(g, bx, by, t.w, t.h)
   const q = quality(t, patch, ring)
   if (q < LOST) {
+    // At the edge when the box touches it, or was heading past it: part of the subject left the frame.
+    const edge =
+      s.x <= 0 || s.y <= 0 || s.x >= maxX || s.y >= maxY || px < 0 || py < 0 || px > maxX || py > maxY
     s.radius = Math.min(4 * baseRadius, s.radius * 2)
     s.vx = 0
     s.vy = 0
-    return { x: null, y: null, q }
+    return { x: null, y: null, q, lost: edge ? ("edge" as const) : ("low-confidence" as const) }
   }
   s.vx = bx - s.x
   s.vy = by - s.y
@@ -203,7 +216,20 @@ const match = (g: Gray, s: State, baseRadius: number) => {
   // Re-anchor on the original appearance when it still matches; otherwise follow the new look.
   if (quality(s.original, patch, ring) >= REFRESH) s.template = s.original
   else if (q >= REFRESH) s.template = patch
-  return { x: bx + sx, y: by + sy, q }
+  return { x: bx + sx, y: by + sy, q, lost: undefined }
+}
+
+/** Runs of lost frames, each with the reason of its first frame. */
+const lostSpans = (range: FrameRange, reasons: ReadonlyArray<LostReason | undefined>): Array<LostSpan> => {
+  const out: Array<LostSpan> = []
+  for (let i = range.first; i <= range.last; i++) {
+    const reason = reasons[i]
+    if (reason === undefined) continue
+    const start = i
+    while (i + 1 <= range.last && reasons[i + 1] !== undefined) i++
+    out.push({ from: range.ref(start), to: range.ref(i), reason })
+  }
+  return out
 }
 
 /**
@@ -226,6 +252,7 @@ export const trackRegion = (
     const ws = nulls()
     const hs = nulls()
     const qs = nulls()
+    const reasons: Array<LostReason | undefined> = Array.from({ length: n }, () => undefined)
     let state: State | undefined
     let scale = 1
     let baseRadius = 0
@@ -261,6 +288,7 @@ export const trackRegion = (
         } else {
           const m = match(g, state, baseRadius)
           qs[i] = round(m.q, 3)
+          reasons[i] = m.lost
           if (m.x !== null && m.y !== null) {
             xs[i] = round(m.x / scale + offset.x, 2)
             ys[i] = round(m.y / scale + offset.y, 2)
@@ -272,7 +300,7 @@ export const trackRegion = (
         }
       })
     ).pipe(
-      Effect.as({
+      Effect.map(() => ({
         name,
         method: "template" as const,
         from: range.ref(range.first),
@@ -281,7 +309,8 @@ export const trackRegion = (
         y: { name: `${name}.y`, unit: "px", samples: ys },
         w: { name: `${name}.w`, unit: "px", samples: ws },
         h: { name: `${name}.h`, unit: "px", samples: hs },
-        confidence: { name: `${name}.confidence`, unit: "0..1", samples: qs }
-      })
+        confidence: { name: `${name}.confidence`, unit: "0..1", samples: qs },
+        lost: lostSpans(range, reasons)
+      }))
     )
   })

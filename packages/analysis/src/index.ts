@@ -4,7 +4,17 @@ export { Cut, Cuts, detectCuts } from "./Cuts.ts"
 export { FrameDifference, frameDifferences } from "./Difference.ts"
 export { MOTION_TRACK, Motion, MotionPeak, MotionWindow, motionEnergy } from "./Motion.ts"
 export { Budget, type SampleRequest, SampleStrategy, parseBudget, sample } from "./Sampling.ts"
-export { Box, RegionTrack, type TrackOptions, parseBox, trackRegion } from "./Tracker.ts"
+export {
+  Box,
+  LostReason,
+  LostSpan,
+  RegionTrack,
+  type TrackOptions,
+  parseBox,
+  trackRegion
+} from "./Tracker.ts"
+export { type Precision, keyframeIndices } from "./Keyframes.ts"
+export { knownSamples } from "./Segment.ts"
 export {
   BezierFit,
   EasingCandidate,

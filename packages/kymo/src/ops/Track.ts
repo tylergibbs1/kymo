@@ -1,4 +1,13 @@
-import { EasingFit, type FrameRange, fitEasing } from "@kymo/analysis"
+import {
+  EasingFit,
+  type FrameRange,
+  LostReason,
+  type Precision,
+  type RegionTrack,
+  fitEasing,
+  keyframeIndices,
+  knownSamples
+} from "@kymo/analysis"
 import {
   Address,
   FrameIndex,
@@ -69,7 +78,7 @@ export const TrackSeries = Schema.Struct({
   max: Schema.NullOr(Schema.Number),
   keyframes: Schema.Array(Keyframe).annotate({
     description:
-      "Turning points: the first and last known values, where it starts or stops moving, and where it reverses."
+      "Turning points, each at its exact frame: the first and last known values, the last frame before it starts moving, the first frame it stops, both ends of a hold, and every local extreme. Empty for confidence, which is summarised by min and lost."
   }),
   samples: Schema.optionalKey(
     Schema.Array(
@@ -97,49 +106,57 @@ export const TrackOutput = Schema.Struct({
   tracks: Schema.Array(TrackSeries),
   plot: Schema.NullOr(Sheet),
   easing: Schema.Array(EasingFit),
+  lost: Schema.Array(
+    Schema.Struct({
+      range: Schema.String.annotate({ description: "The frames with no position, e.g. 26f..01s15f." }),
+      frames: Schema.Int.annotate({ description: "How many frames that is." }),
+      reason: LostReason.annotate({
+        description:
+          "low-confidence: the box no longer matches what it showed at the first frame. edge: the box ran into the frame edge."
+      })
+    })
+  ).annotate({
+    description:
+      "Where a measured box was lost (its samples are null), in frame order. Empty for source tracks."
+  }),
   note: Schema.optionalKey(Schema.String)
 }).annotate({ identifier: "TrackOutput" })
 
 const invalid = (message: string, hint: string) => Effect.fail(new InvalidInput({ message, hint }))
 
-/** A change smaller than this fraction of the track's span counts as standing still... */
-const STILL = 0.005
-/** ...as does one below the measurement noise of its unit (sub-pixel jitter is not a turning point). */
+/** Measurement noise by unit: a measured wobble below this is not a turning point. */
 const NOISE: Readonly<Record<string, number>> = { px: 0.5, "0..1": 0.01, ratio: 0.01 }
 
-const keyframes = (track: Track, range: FrameRange) => {
-  const known: Array<readonly [number, number]> = []
-  for (let i = range.first; i <= range.last; i++) {
-    const v = track.samples[i]
-    if (v !== null && v !== undefined) known.push([i, v])
-  }
-  if (known.length === 0) return { min: null, max: null, keyframes: [] }
-  const values = known.map(([, v]) => v)
-  const min = Math.min(...values)
-  const max = Math.max(...values)
-  const eps = Math.max(STILL * (max - min), NOISE[track.unit] ?? 0)
-  const dir = (k: number) => {
-    const d = known[k + 1]![1] - known[k]![1]
-    return Math.abs(d) <= eps ? 0 : Math.sign(d)
-  }
-  const turns = [0]
-  for (let k = 1; k < known.length - 1; k++) if (dir(k - 1) !== dir(k)) turns.push(k)
-  if (known.length > 1) turns.push(known.length - 1)
+const summary = (track: Track, range: FrameRange, method: Measured["method"], role: Role) => {
+  const values = knownSamples(track, range).map(([, v]) => v)
+  if (values.length === 0) return { min: null, max: null, keyframes: [] }
+  const precision: Precision =
+    method === "source" ? { _tag: "source" } : { _tag: "measured", noise: NOISE[track.unit] ?? 0 }
   return {
-    min,
-    max,
-    keyframes: turns.map((k) => {
-      const [index, value] = known[k]!
-      return { address: Address.format(range.rate, index), index: FrameIndex.make(index), value }
-    })
+    min: Math.min(...values),
+    max: Math.max(...values),
+    keyframes:
+      role === "confidence"
+        ? []
+        : keyframeIndices(track, range, precision).map((index) => ({
+            address: Address.format(range.rate, index),
+            index: FrameIndex.make(index),
+            value: track.samples[index]!
+          }))
   }
 }
 
 const REGION_PROPS = ["x", "y", "w", "h", "confidence"] as const
 
+const CONCISE_NOTE = "Keyframes only; pass format=detailed for every frame."
+
+/** A value track, or the match quality of a measured box (summarised, never keyframed or eased). */
+type Role = "value" | "confidence"
+
 interface Measured {
   readonly method: "source" | "template"
-  readonly tracks: ReadonlyArray<Track>
+  readonly tracks: ReadonlyArray<{ readonly track: Track; readonly role: Role }>
+  readonly region?: RegionTrack
 }
 
 /** The tracks the caller asked for: measured from a box, or read from the source. */
@@ -161,7 +178,14 @@ const measure = (input: TrackInput, source: Source, range: FrameRange): Effect.E
           `A tracked box has no ${unknown.join(", ")}.`,
           `Pick from ${REGION_PROPS.join(", ")}, e.g. props=["x","y"].`
         )
-      return { method: "template", tracks: wanted.map((p) => byProp[p as keyof typeof byProp]) }
+      return {
+        method: "template",
+        region,
+        tracks: wanted.map((p) => ({
+          track: byProp[p as keyof typeof byProp],
+          role: p === "confidence" ? ("confidence" as const) : ("value" as const)
+        }))
+      }
     }
     const names = input.props ?? timeline.tracks.map((t) => t.name)
     if (names.length === 0)
@@ -169,14 +193,35 @@ const measure = (input: TrackInput, source: Source, range: FrameRange): Effect.E
         `${timeline.handle} has no numeric tracks of its own.`,
         "Measure a region instead: pass box=x,y,w,h in source pixels, e.g. box=120,80,64,64."
       )
-    return { method: "source", tracks: yield* Effect.forEach(names, (name) => source.track(name)) }
+    const tracks = yield* Effect.forEach(names, (name) => source.track(name))
+    return { method: "source", tracks: tracks.map((track) => ({ track, role: "value" as const })) }
   })
+
+/** What to tell the caller about a lost box: a wrong starting box, or the subject leaving the frame. */
+const lostNotes = (input: TrackInput, region: RegionTrack, range: FrameRange, handle: string) => {
+  const notes: Array<string> = []
+  const [first] = region.lost
+  if (first?.reason === "low-confidence" && first.from.index === range.first + 1 && "box" in input) {
+    const at = Address.format(range.rate, range.first)
+    const [, , w, h] = input.box.split(",").map((p) => p.trim())
+    const rangeFlag = input.range === undefined ? "" : ` --range ${input.range}`
+    notes.push(
+      `Lost the box right after ${at}: the box must be where the subject is at ${at}, the first frame of the range. Look with kymo frames ${handle} --at ${at} --view grid, then pass the box you see there, e.g. kymo track ${handle}${rangeFlag} --box x,y,${w},${h}.`
+    )
+  }
+  const edge = region.lost.filter((l) => l.reason === "edge")
+  if (edge.length > 0)
+    notes.push(
+      `No position in ${edge.map((l) => range.spanText(l.from.index, l.to.index)).join(", ")}: the box reached the frame edge, so part of the subject is outside the frame.`
+    )
+  return notes
+}
 
 export const track = define({
   name: "track",
   title: "Measure motion",
   description:
-    "Measure motion as numbers: positions per frame of a region you name with box (template matching), or the source's own tracks (synthetic ground truth, telemetry). Returns keyframes (turning points) or every sample, an optional chart image and an optional easing fit. Prefer these numbers over estimating positions from pixels; use check to test them against rules or assertions.",
+    "Measure motion as numbers: positions per frame of a region you name with box (template matching), or the source's own tracks (synthetic ground truth, telemetry). Returns keyframes (turning points: where it starts, stops and reverses, at exact frames); pass format=detailed for every frame's sample. Also an optional chart image, an optional easing fit, and where a box was lost. The box must be where the subject is at the first frame of the range. Prefer these numbers over estimating positions from pixels; use check to test them against rules or assertions.",
   cost: "no images unless plot=true; then 1 chart image, ≤4784 visual tokens at high-res",
   examples: [
     { source: "synthetic:ease?easing=ease-out", props: ["box.x"], fitEasing: true },
@@ -195,10 +240,10 @@ export const track = define({
     const range = yield* analysisRange(timeline, input.range)
     const measured = yield* measure(input, source, range)
     const detailed = input.format === "detailed"
-    const series: Array<TrackSeries> = measured.tracks.map((t) => ({
+    const series: Array<TrackSeries> = measured.tracks.map(({ track: t, role }) => ({
       name: t.name,
       unit: t.unit,
-      ...keyframes(t, range),
+      ...summary(t, range, measured.method, role),
       ...(detailed
         ? {
             samples: range.indices().map((index) => ({
@@ -210,7 +255,8 @@ export const track = define({
           }
         : {})
     }))
-    const local = new Map(measured.tracks.map((t) => [t.name, t]))
+    const tracks = measured.tracks.map((m) => m.track)
+    const local = new Map(tracks.map((t) => [t.name, t]))
     const withTracks: Source = {
       ...source,
       track: (name) => {
@@ -221,7 +267,7 @@ export const track = define({
     const plotted = input.plot
       ? yield* plotView({
           source: withTracks,
-          tracks: measured.tracks.map((t) => t.name),
+          tracks: tracks.map((t) => t.name),
           range: { first: range.first, last: range.last },
           outDir: yield* output.dirFor(timeline.handle),
           target: input.target
@@ -229,10 +275,18 @@ export const track = define({
       : undefined
     const fits = input.fitEasing
       ? measured.tracks
-          .filter((t) => !t.name.endsWith(".confidence"))
-          .map((t) => [t.name, fitEasing(t, range)] as const)
+          .filter((m) => m.role === "value")
+          .map(({ track: t }) => [t.name, fitEasing(t, range)] as const)
       : []
     const still = fits.filter(([, r]) => Result.isFailure(r)).map(([name]) => name)
+    const span = range.spanText(range.first, range.last)
+    const notes = [
+      ...(measured.region === undefined ? [] : lostNotes(input, measured.region, range, timeline.handle)),
+      ...(still.length > 0
+        ? [`No easing fit for ${still.join(", ")}: it does not change enough in ${span}.`]
+        : []),
+      ...(detailed ? [] : [CONCISE_NOTE])
+    ]
     return {
       handle: timeline.handle,
       range: range.spanText(range.first, range.last),
@@ -243,15 +297,16 @@ export const track = define({
           ? null
           : sheetOf(
               plotted,
-              `Plot · ${timeline.handle} · ${range.spanText(range.first, range.last).replace("..", "–")} · ${measured.tracks.map((t) => t.name).join(", ")}`,
+              `Plot · ${timeline.handle} · ${span.replace("..", "–")} · ${tracks.map((t) => t.name).join(", ")}`,
               input.format
             ),
       easing: fits.flatMap(([, r]) => (Result.isSuccess(r) ? [r.success] : [])),
-      ...(still.length > 0
-        ? {
-            note: `No easing fit for ${still.join(", ")}: it does not change enough in ${range.spanText(range.first, range.last)}.`
-          }
-        : {})
+      lost: (measured.region?.lost ?? []).map((l) => ({
+        range: range.spanText(l.from.index, l.to.index),
+        frames: l.to.index - l.from.index + 1,
+        reason: l.reason
+      })),
+      ...(notes.length > 0 ? { note: notes.join(" ") } : {})
     }
   }, Effect.scoped)
 })

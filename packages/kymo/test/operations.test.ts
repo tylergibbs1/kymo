@@ -302,6 +302,89 @@ describe("track", () => {
       expect(select.hint).toContain("box=")
     }).pipe(Effect.provide(fresh))
   )
+
+  const indices = (series: { readonly keyframes: ReadonlyArray<{ readonly index: number }> }) =>
+    series.keyframes.map((k) => k.index)
+
+  /** Indices of strict local extremes in `values` (plateaus count once, at their first frame). */
+  const extremes = (values: ReadonlyArray<number>): Array<number> => {
+    const out: Array<number> = []
+    let k = 1
+    while (k < values.length - 1) {
+      let end = k
+      while (end + 1 < values.length && values[end + 1] === values[k]) end++
+      const before = values[k - 1]!
+      const after = values[end + 1]
+      if (after !== undefined && Math.sign(values[k]! - before) === Math.sign(values[k]! - after)) out.push(k)
+      k = end + 1
+    }
+    return out
+  }
+
+  it.effect("keyframes are the exact extremes and the exact first and last moving frames", () =>
+    Effect.gen(function* () {
+      const bounce = yield* call(track, { source: BOUNCE, props: ["box.x"], format: "detailed" })
+      const xs = bounce.tracks[0]!.samples!.map((s) => s.value!)
+      expect(extremes(xs)).toEqual([20, 28, 36, 41])
+      expect(indices(bounce.tracks[0]!)).toEqual([0, 20, 28, 36, 41, 46, 89])
+
+      for (const easing of ["ease-in", "ease-out", "ease-in-out", "spring(170,12)"]) {
+        const source = `synthetic:ease?easing=${easing}`
+        const { markers } = yield* call(probe, { source })
+        const out = yield* call(track, { source, props: ["box.x"] })
+        for (const m of markers) expect(indices(out.tracks[0]!), `${easing} @${m.name}`).toContain(m.index)
+      }
+    }).pipe(Effect.provide(fresh))
+  )
+
+  it.effect("measured keyframes hit the measured extremes; confidence is summarised, not keyframed", () =>
+    Effect.gen(function* () {
+      const out = yield* call(track, {
+        source: BOUNCE,
+        box: "64,137,43,43",
+        props: ["x", "confidence"],
+        format: "detailed"
+      })
+      const [x, confidence] = out.tracks
+      const xs = x!.samples!.map((s) => s.value!)
+      for (const k of extremes(xs)) expect(indices(x!)).toContain(k)
+      expect(confidence!.keyframes).toEqual([])
+      expect(confidence!.min).toBeGreaterThan(0.5)
+      expect(out.lost).toEqual([])
+    }).pipe(Effect.provide(fresh))
+  )
+
+  it.effect("concise output says the samples are one call away", () =>
+    Effect.gen(function* () {
+      const concise = yield* call(track, { source: BOUNCE, props: ["box.x"] })
+      expect(concise.note).toContain("Keyframes only; pass format=detailed for every frame.")
+      const detailed = yield* call(track, { source: BOUNCE, props: ["box.x"], format: "detailed" })
+      expect(detailed.note).toBeUndefined()
+      expect(track.description).toContain("format=detailed")
+    }).pipe(Effect.provide(fresh))
+  )
+
+  it.effect("says when the box was lost right after the first frame of the range, and why", () =>
+    Effect.gen(function* () {
+      const out = yield* call(track, { source: BOUNCE, box: "64,137,43,43", range: "#25..#45" })
+      expect(out.lost[0]).toMatchObject({ range: "26f..01s15f", frames: 20, reason: "low-confidence" })
+      expect(out.note).toContain("the box must be where the subject is at 25f, the first frame of the range")
+      expect(out.note).toMatch(/kymo track clip1 --range #25\.\.#45 --box x,y,43,43/)
+    }).pipe(Effect.provide(fresh))
+  )
+
+  it.effect("says when the box was lost at the frame edge", () =>
+    Effect.gen(function* () {
+      const SAFE = "synthetic:safe-area"
+      const truth = yield* call(track, { source: SAFE, props: ["box.x", "box.y", "box.w"], range: "0f..0f" })
+      const [x, y, w] = truth.tracks.map((t) => Math.round(t.min!))
+      const out = yield* call(track, { source: SAFE, box: `${x},${y},${w},${w}` })
+      expect(out.lost.length).toBeGreaterThan(0)
+      expect(out.lost.at(-1)).toMatchObject({ reason: "edge" })
+      expect(out.lost.at(-1)!.range).toMatch(/\.\.02s29f$/)
+      expect(out.note).toContain("frame edge")
+    }).pipe(Effect.provide(fresh))
+  )
 })
 
 describe("check", () => {
