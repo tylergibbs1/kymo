@@ -8,7 +8,7 @@
 | Directory of numbered frames | `frames/`, `frames/?fps=24` | 30 fps unless `?fps=` says otherwise    |
 | Animated GIF or WebP         | `loader.gif`                | The file's own frame delays, or `?fps=` |
 
-Rates can be exact: `?fps=29.97` and `?fps=30000/1001` are the same rate. Directories hold PNG or JPG frames, played in name order (`frame_001.png`, `frame_002.png`, …). Video files are anything ffmpeg reads with one of the usual extensions: mp4, mov, m4v, webm, mkv, ogg/ogv, avi, flv, wmv/asf, mpg/mpeg, ts/mts/m2ts, 3gp, mxf, y4m.
+A directory has no timing of its own, so probe reports `"rateFrom": "assumed"`; pass the capture rate with `?fps=` before reading any time or duration. Rates can be exact: `?fps=29.97` and `?fps=30000/1001` are the same rate. Directories hold PNG or JPG frames, played in name order (`frame_001.png`, `frame_002.png`, …). Video files are anything ffmpeg reads with one of the usual extensions: mp4, mov, m4v, webm, mkv, ogg/ogv, avi, flv, wmv/asf, mpg/mpeg, ts/mts/m2ts, 3gp, mxf, y4m.
 
 Video needs `ffmpeg` and `ffprobe` on `PATH`, or `KYMO_FFMPEG` and `KYMO_FFPROBE` set to the binaries. Without them, video calls fail with `AdapterUnavailable` and an install hint; image sequences and synthetic sources still work.
 

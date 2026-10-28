@@ -53,6 +53,7 @@ export class SyntheticAdapter extends Context.Service<SyntheticAdapter, Register
           kind: "synthetic",
           input,
           rate: clip.rate,
+          rateFrom: "source",
           frameCount: clip.frames,
           size: clip.size,
           tracks: model.tracks,

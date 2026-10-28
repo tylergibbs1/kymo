@@ -101,6 +101,7 @@ export const fakeSource = (options: FakeOptions): Source => {
     kind: "synthetic",
     input: "fake://test",
     rate: r,
+    rateFrom: "source",
     fps: options.fps ?? 30,
     frameCount: options.frames,
     duration: Address.format(r, options.frames),

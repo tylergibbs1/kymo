@@ -56,6 +56,14 @@ describe("image sequence sources", () => {
     })
   )
 
+  it.effect("a directory's rate is marked assumed until ?fps= gives it; a GIF's comes from the file", () =>
+    Effect.gen(function* () {
+      assert.strictEqual((yield* open(frames)).timeline.rateFrom, "assumed")
+      assert.strictEqual((yield* open(`${frames}?fps=60`)).timeline.rateFrom, "param")
+      assert.strictEqual((yield* open(gif)).timeline.rateFrom, "source")
+    })
+  )
+
   it.effect("?fps= sets the rate", () =>
     Effect.gen(function* () {
       const source = yield* open(`${frames}?fps=24000/1001`)

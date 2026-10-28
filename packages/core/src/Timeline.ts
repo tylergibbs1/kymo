@@ -41,12 +41,20 @@ export const Track = Schema.Struct({
 })
 export type Track = typeof Track.Type
 
+export const RateFrom = Schema.Literals(["source", "param", "assumed"]).annotate({
+  description:
+    "Where the rate came from: source (the file's own timing), param (an ?fps= on the input) or assumed (the source has no timing, so a default was used; pass ?fps= with the capture rate, or every time and duration will be wrong)."
+})
+export type RateFrom = typeof RateFrom.Type
+
 export const Timeline = Schema.Struct({
   handle: Schema.String,
   kind: SourceKind,
   /** The path, URL or spec this Timeline was opened from. */
   input: Schema.String,
   rate: Rate,
+  /** Where `rate` came from: the file itself, an `?fps=` on the input, or a default because the source has none. */
+  rateFrom: RateFrom,
   /** Nominal frames per second, `rate.num / rate.den`. */
   fps: Schema.Number,
   frameCount: Schema.Int,

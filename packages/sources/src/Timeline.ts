@@ -3,6 +3,7 @@ import {
   InvalidInput,
   type Marker,
   type Rate,
+  type RateFrom,
   type Size,
   type Timeline,
   type Track,
@@ -19,6 +20,7 @@ export interface TimelineFields {
   readonly kind: Timeline["kind"]
   readonly input: string
   readonly rate: Rate
+  readonly rateFrom: RateFrom
   readonly frameCount: number
   readonly size: Size
   /** Set when frame times come from presentation timestamps (or GIF delays) rather than `rate`. */
@@ -38,6 +40,7 @@ export const makeTimeline = (f: TimelineFields): Timeline => {
     kind: f.kind,
     input: f.input,
     rate,
+    rateFrom: f.rateFrom,
     fps: fpsOf(rate),
     frameCount: f.frameCount,
     duration: Address.format(rate, f.frameCount),

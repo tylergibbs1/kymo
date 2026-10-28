@@ -62,6 +62,7 @@ export class VideoAdapter extends Context.Service<VideoAdapter, RegisteredAdapte
               kind: "video",
               input,
               rate: info.rate,
+              rateFrom: "source",
               frameCount: info.pts.length,
               size: info.size,
               ...(info.vfr

@@ -1,5 +1,13 @@
 import { NodeServices } from "@effect/platform-node"
-import { BackendFailure, InvalidInput, type Rate, RgbImage, type Size, SourceNotFound } from "@kymo/core"
+import {
+  BackendFailure,
+  InvalidInput,
+  type Rate,
+  type RateFrom,
+  RgbImage,
+  type Size,
+  SourceNotFound
+} from "@kymo/core"
 import { Context, Effect, FileSystem, Layer, Path, Schema } from "effect"
 import sharp from "sharp"
 import { frameSource, type RegisteredAdapter } from "../Adapter.ts"
@@ -90,6 +98,7 @@ export class ImageSeqAdapter extends Context.Service<ImageSeqAdapter, Registered
         readonly frames: ReadonlyArray<{ readonly file: string; readonly page: number | undefined }>
         readonly size: Size
         readonly timing: Timing
+        readonly rateFrom: RateFrom
         readonly input: string
       }
 
@@ -109,6 +118,7 @@ export class ImageSeqAdapter extends Context.Service<ImageSeqAdapter, Registered
           frames,
           size: { width: meta.width, height: meta.height },
           timing: { _tag: "Constant", rate: fps ?? { num: DEFAULT_SEQUENCE_FPS, den: 1 } },
+          rateFrom: fps ? "param" : "assumed",
           input: fps ? input : `${input}?fps=${DEFAULT_SEQUENCE_FPS}`
         } satisfies Layout
       })
@@ -122,6 +132,7 @@ export class ImageSeqAdapter extends Context.Service<ImageSeqAdapter, Registered
           timing: fps
             ? { _tag: "Constant", rate: fps }
             : timingFromDelays(Array.from({ length: pages }, (_, i) => meta.delay?.[i] ?? 100)),
+          rateFrom: fps ? "param" : "source",
           input
         } satisfies Layout
       })
@@ -148,6 +159,7 @@ export class ImageSeqAdapter extends Context.Service<ImageSeqAdapter, Registered
           frames,
           size,
           timing,
+          rateFrom,
           input: recordedInput
         }: Layout = info.type === "Directory"
           ? yield* directory(input, target, fps)
@@ -158,6 +170,7 @@ export class ImageSeqAdapter extends Context.Service<ImageSeqAdapter, Registered
           kind: "image-seq",
           input: recordedInput,
           rate: timing.rate,
+          rateFrom,
           frameCount: frames.length,
           size,
           ...(timing._tag === "Delays" ? { clock: { starts: timing.starts, end: timing.total } } : {})

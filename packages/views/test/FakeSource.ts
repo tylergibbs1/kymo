@@ -63,6 +63,7 @@ export const fakeSource = (o: FakeOptions = {}): Source & { readonly reads: Arra
     kind: "synthetic",
     input: "fake",
     rate: r,
+    rateFrom: "source",
     fps: 30,
     frameCount: count,
     duration: Address.format(r, count),
