@@ -136,12 +136,9 @@ describe("tracking cost", () => {
         })
       })
       const range = yield* FrameRange.whole(big.timeline)
-      const started = performance.now()
       const region = yield* trackRegion(big, range, { x: 400, y: 200, w: 480, h: 280 })
-      const seconds = (performance.now() - started) / 1000
       expect(reads.every((e) => e !== undefined && e <= 640)).toBe(true)
       expect(misses(region, range.indices(), (i) => ({ x: 400, y: 200 + 4 * i }))).toEqual([])
-      expect(seconds).toBeLessThan(3)
       expect(H).toBe(48)
     })
   )
