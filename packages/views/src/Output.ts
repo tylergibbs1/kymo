@@ -14,6 +14,12 @@ export const ViewImage = Schema.Struct({
   height: Schema.Int,
   /** Visual tokens the image costs (⌈w/28⌉·⌈h/28⌉). */
   tokens: Schema.Int,
+  /** Size of the encoded file; never more than the target's byte budget. */
+  bytes: Schema.Int,
+  /** 1-based number of this image among every image of the request, across cursors. */
+  sheet: Schema.Int,
+  /** Images the whole request takes, across cursors. */
+  sheets: Schema.Int,
   frames: Schema.Array(FrameRef)
 })
 export type ViewImage = typeof ViewImage.Type

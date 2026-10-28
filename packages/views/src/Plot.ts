@@ -12,7 +12,7 @@ import { TOKEN_TILE_PX, type Target, targetBudget } from "@kymo/layout"
 import { Effect } from "effect"
 import type { ViewImage } from "./Output.ts"
 import { fileSafe } from "./internal/Frames.ts"
-import { writeImage } from "./internal/Pages.ts"
+import { ONLY, writeImage } from "./internal/Pages.ts"
 import { line, rect, text } from "./internal/Svg.ts"
 
 /** Chart width, unless the target's long edge is smaller. */
@@ -164,6 +164,7 @@ export const plot = Effect.fn("plot")(function* (o: PlotOptions): Effect.fn.Retu
   return yield* writeImage(
     {
       view: "plot",
+      target: o.target,
       outDir: o.outDir,
       fileName: (span) => `${span}.plot.${o.tracks.map(fileSafe).join("+")}.png`
     },
@@ -178,6 +179,7 @@ export const plot = Effect.fn("plot")(function* (o: PlotOptions): Effect.fn.Retu
           .map((t, k) => panel(t, first, last, k * panelHeight, width, panelHeight, timeline.rate))
           .join("")
       }
-    }
+    },
+    ONLY
   )
 })

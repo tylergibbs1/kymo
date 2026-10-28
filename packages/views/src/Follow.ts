@@ -105,6 +105,7 @@ export const follow = Effect.fn("follow")(function* (
   )
   const destination = {
     view: "follow",
+    target: o.target,
     outDir: o.outDir,
     fileName: (span: string) => `${span}.follow.${boxName(box)}.png`
   } as const

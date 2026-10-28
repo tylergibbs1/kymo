@@ -3,7 +3,7 @@ import { type Target, planGrid } from "@kymo/layout"
 import { Effect } from "effect"
 import type { ViewImage } from "./Output.ts"
 import { checkFrames, frameRef, frameSize, readFrames, spanLabel, spanOf } from "./internal/Frames.ts"
-import { writeImage } from "./internal/Pages.ts"
+import { ONLY, writeImage } from "./internal/Pages.ts"
 import { onionSkin } from "./internal/Pixels.ts"
 import { label } from "./internal/Svg.ts"
 
@@ -39,7 +39,7 @@ export const onion = Effect.fn("onion")(function* (o: OnionOptions): Effect.fn.R
   const cell = plan.cells[0]!
   const decoded = yield* readFrames(o.source, o.frames, Math.max(plan.frame.width, plan.frame.height))
   return yield* writeImage(
-    { view: "onion", outDir: o.outDir, fileName: (span) => `${span}.onion.png` },
+    { view: "onion", outDir: o.outDir, target: o.target, fileName: (span) => `${span}.onion.png` },
     {
       span: spanOf(timeline, o.frames),
       frames: decoded.map((f) => frameRef(timeline, f)),
@@ -49,6 +49,7 @@ export const onion = Effect.fn("onion")(function* (o: OnionOptions): Effect.fn.R
         tiles: [{ image: onionSkin(decoded.map((f) => f.image)), rect: cell.frame }],
         overlay: label(cell.label, text)
       }
-    }
+    },
+    ONLY
   )
 })

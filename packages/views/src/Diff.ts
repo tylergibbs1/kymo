@@ -46,6 +46,7 @@ export const diff = Effect.fn("diff")(function* (o: DiffOptions): Effect.fn.Retu
   )
   const destination = {
     view: "diff",
+    target: o.target,
     outDir: o.outDir,
     fileName: (span: string) => `${span}.diff.png`
   } as const

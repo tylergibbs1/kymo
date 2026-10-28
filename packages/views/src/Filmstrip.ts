@@ -125,6 +125,7 @@ export const filmstrip = Effect.fn("filmstrip")(function* (
   )
   const destination = {
     view: "filmstrip",
+    target: o.target,
     outDir: o.outDir,
     fileName: (span: string) => `${span}.filmstrip.png`
   } as const

@@ -46,6 +46,7 @@ export const sheet = Effect.fn("sheet")(function* (o: SheetOptions): Effect.fn.R
   )
   const destination = {
     view: "sheet",
+    target: o.target,
     outDir: o.outDir,
     fileName: (span: string) => (o.pixelGrid ? `${span}.grid.png` : `${span}.png`)
   } as const

@@ -2,7 +2,9 @@
 import { FRAME_CAP } from "@kymo/core"
 import {
   Cursor as LayoutCursor,
+  DEFAULT_MAX_BYTES,
   MAX_TARGET_EDGE,
+  MIN_TARGET_BYTES,
   MIN_TARGET_EDGE,
   MIN_TARGET_TOKENS,
   Target
@@ -17,6 +19,12 @@ export const Source = Schema.String.check(Schema.isMinLength(1)).annotate({
 /** The handle to give a source; shared by every operation that can name one, so they accept it alike. */
 export const As = Schema.String.check(Schema.isMinLength(1)).annotate({
   description: "The handle to use for this source, e.g. hero. Default: the next free clipN."
+})
+
+/** Rebinding a taken handle loses that source's markers, so it is only done when asked for. */
+export const Replace = Schema.Boolean.annotate({
+  description:
+    "With as: point an existing handle at this source even though it names another one, dropping that source's markers. Without it, reusing a taken handle is an error."
 })
 
 export const Address = Schema.String.check(Schema.isMinLength(1)).annotate({
@@ -47,7 +55,12 @@ const CustomBudget = Schema.Struct({
   }),
   maxTokens: Schema.Int.check(Schema.isGreaterThanOrEqualTo(MIN_TARGET_TOKENS)).annotate({
     description: "Visual tokens per image (one per started 28x28 tile)."
-  })
+  }),
+  maxBytes: Schema.optionalKey(
+    Schema.Int.check(Schema.isGreaterThanOrEqualTo(MIN_TARGET_BYTES)).annotate({
+      description: `Bytes per image file. Default ${DEFAULT_MAX_BYTES} (5 MB as base64). Larger images are re-encoded with a palette, then scaled down.`
+    })
+  )
 })
 
 type TargetEncoded = (typeof Target)["Encoded"]
@@ -59,18 +72,18 @@ type TargetEncoded = (typeof Target)["Encoded"]
 export const TargetInput = Schema.Union([Schema.Literals(["high-res", "standard"]), CustomBudget])
   .annotate({
     description:
-      'Image budget: "high-res" (default; ≤2576 px, ≤4784 visual tokens per image), "standard" (≤1568 px, ≤1568 tokens) for older model tiers, or a custom {maxEdge, maxTokens}.'
+      'Image budget: "high-res" (default; ≤2576 px, ≤4784 visual tokens per image), "standard" (≤1568 px, ≤1568 tokens) for older model tiers, or a custom {maxEdge, maxTokens, maxBytes?}. Every image stays under maxBytes (default 3.75 MB, 5 MB as base64).'
   })
   .pipe(
     Schema.decodeTo(
       Target,
       SchemaTransformation.transform({
-        decode: (t): TargetEncoded =>
-          typeof t === "string"
-            ? { _tag: t }
-            : { _tag: "custom", maxEdge: t.maxEdge, maxTokens: t.maxTokens },
-        encode: (t: TargetEncoded) =>
-          t._tag === "custom" ? { maxEdge: t.maxEdge, maxTokens: t.maxTokens } : t._tag
+        decode: (t): TargetEncoded => (typeof t === "string" ? { _tag: t } : { _tag: "custom", ...t }),
+        encode: (t: TargetEncoded) => {
+          if (t._tag !== "custom") return t._tag
+          const { _tag, ...budget } = t
+          return budget
+        }
       })
     ),
     Schema.withDecodingDefaultKey(Effect.succeed("high-res" as const))
@@ -89,7 +102,7 @@ export const Cursor = LayoutCursor.annotate({
 })
 
 export const Uncapped = Schema.Boolean.annotate({
-  description: `Allow more than ${FRAME_CAP} frames in one request. Costs grow with every sheet; prefer a step or sample=motion.`
+  description: `Allow more than ${FRAME_CAP} frames in one request. Costs grow with every sheet; prefer a step like 0f..-1f:10f.`
 })
 
 /** A box in source pixels, `x,y,w,h`, as typed on a command line and in hints. */
