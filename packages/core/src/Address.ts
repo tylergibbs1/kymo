@@ -10,7 +10,7 @@
  * `parse` turns text into an Address; `resolve` turns an Address into frame
  * indices against one Timeline; `format` is the canonical inverse.
  */
-import { Effect, Result } from "effect"
+import { Effect, Result, Schema } from "effect"
 import { AddressOutOfRange, AddressParseError, NotSeekable } from "./Errors.ts"
 import { type FrameIndex, type Rate, frameIndex, indexAtSeconds, timecodeBase } from "./Rate.ts"
 
@@ -167,8 +167,22 @@ export const format = (rate: Rate, index: number): string => {
   return out.join("")
 }
 
+/** How frames are labelled for people and agents: `08s10f #250` (both), `08s10f` (timecode) or `#250` (index). */
+export const LabelStyle = Schema.Literals(["both", "timecode", "index"])
+export type LabelStyle = typeof LabelStyle.Type
+
+export const DEFAULT_LABEL_STYLE: LabelStyle = "both"
+
+/** A frame's label in a style: `08s10f #250`, `08s10f` or `#250`. */
+export const styledLabel = (rate: Rate, index: number, style: LabelStyle): string =>
+  style === "timecode"
+    ? format(rate, index)
+    : style === "index"
+      ? `#${index}`
+      : `${format(rate, index)} #${index}`
+
 /** The label form: timecode for reading, index for arithmetic. `08s10f #250`. */
-export const label = (rate: Rate, index: number): string => `${format(rate, index)} #${index}`
+export const label = (rate: Rate, index: number): string => styledLabel(rate, index, "both")
 
 /** A sheet or file span name: `0f-08s10f`. */
 export const spanName = (rate: Rate, first: number, last: number): string =>

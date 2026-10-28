@@ -33,6 +33,61 @@ describe("region tracking", () => {
     })
   )
 
+  it.effect("keeps hold of a fast square that reverses off a wall", () =>
+    Effect.gen(function* () {
+      // Accelerates right at up to 9px/frame, hits x=49, and rebounds: a constant-velocity
+      // prediction overshoots the reversal by about twice the speed.
+      const xs = [4, 5, 7, 10, 14, 19, 25, 32, 40, 49, 41, 34, 28, 23, 19, 16, 14, 13, 13, 13]
+      const bouncing = fakeSource({
+        frames: xs.length,
+        scene: (i) => ({ background: [70, 90, 80], texture: 25, rects: texturedSquare(xs[i]!, 18, 12) })
+      })
+      const range = yield* FrameRange.whole(bouncing.timeline)
+      const region = yield* trackRegion(bouncing, range, { x: 4, y: 18, w: 12, h: 12 })
+      xs.forEach((x, i) => {
+        expect(region.x.samples[i], `frame ${i}`).not.toBeNull()
+        expect(Math.abs(region.x.samples[i]! - x), `frame ${i}`).toBeLessThanOrEqual(1)
+      })
+    })
+  )
+
+  it.effect("keeps hold of a flat square whose edges blend between pixels", () =>
+    Effect.gen(function* () {
+      // A plain white square moving 2.5px/frame. On half-pixel frames each vertical edge is smeared
+      // over two columns, as resampling a sub-pixel position draws it; resampling also leaves a
+      // faint ripple (here 2 grey levels) just inside the edges.
+      const shade = (k: number) => [28 + k * 207, 28 + k * 207, 32 + k * 203] as const
+      const pos = (i: number) => 4 + 2.5 * i
+      const flat = fakeSource({
+        frames: 16,
+        scene: (i) => {
+          const x = Math.floor(pos(i))
+          const ripple = [
+            { x: x + 2, y: 18, w: 1, h: 12, rgb: [237, 237, 237] as const },
+            { x: x + 9, y: 18, w: 1, h: 12, rgb: [233, 233, 233] as const }
+          ]
+          const rects = Number.isInteger(pos(i))
+            ? [{ x, y: 18, w: 12, h: 12, rgb: shade(1) }, ...ripple]
+            : [
+                { x, y: 18, w: 1, h: 12, rgb: shade(0.25) },
+                { x: x + 1, y: 18, w: 1, h: 12, rgb: shade(0.75) },
+                { x: x + 2, y: 18, w: 9, h: 12, rgb: shade(1) },
+                { x: x + 11, y: 18, w: 1, h: 12, rgb: shade(0.75) },
+                { x: x + 12, y: 18, w: 1, h: 12, rgb: shade(0.25) },
+                ...ripple
+              ]
+          return { background: [28, 28, 32], rects }
+        }
+      })
+      const range = yield* FrameRange.whole(flat.timeline)
+      const region = yield* trackRegion(flat, range, { x: 4, y: 18, w: 12, h: 12 })
+      for (let i = 0; i < 16; i++) {
+        expect(region.x.samples[i], `frame ${i}`).not.toBeNull()
+        expect(Math.abs(region.x.samples[i]! - pos(i)), `frame ${i}`).toBeLessThanOrEqual(1)
+      }
+    })
+  )
+
   it.effect("flags the region leaving the safe area", () =>
     Effect.gen(function* () {
       const range = yield* FrameRange.whole(source.timeline)

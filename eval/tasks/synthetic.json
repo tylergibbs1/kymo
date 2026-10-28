@@ -1,0 +1,1079 @@
+{
+  "tasks": [
+    {
+      "id": "impact-30fps-f20",
+      "split": "dev",
+      "source": "synthetic:bounce?size=640x360&fps=30&frames=90&impact=20",
+      "clock": {
+        "rate": {
+          "num": 30,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "impact",
+        "subject": {
+          "x": 64,
+          "y": 158,
+          "w": 43,
+          "h": 44
+        }
+      },
+      "prompt": "A ball is pulled sideways toward a wall on the right of the frame. At 0f it is inside the box x=64, y=158, w=43, h=44 (pixels). At which frame does the ball first touch the wall?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 20,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "impact-30fps-f24",
+      "split": "dev",
+      "source": "synthetic:bounce?size=640x360&fps=30&frames=90&impact=24&decay=0.5",
+      "clock": {
+        "rate": {
+          "num": 30,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "impact",
+        "subject": {
+          "x": 64,
+          "y": 158,
+          "w": 43,
+          "h": 44
+        }
+      },
+      "prompt": "A ball is pulled sideways toward a wall on the right of the frame. At 0f it is inside the box x=64, y=158, w=43, h=44 (pixels). At which frame does the ball first touch the wall?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 24,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "impact-30fps-f30",
+      "split": "heldout",
+      "source": "synthetic:bounce?size=640x360&fps=30&frames=90&impact=30",
+      "clock": {
+        "rate": {
+          "num": 30,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "impact",
+        "subject": {
+          "x": 64,
+          "y": 158,
+          "w": 43,
+          "h": 44
+        }
+      },
+      "prompt": "A ball is pulled sideways toward a wall on the right of the frame. At 0f it is inside the box x=64, y=158, w=43, h=44 (pixels). At which frame does the ball first touch the wall?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 30,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "impact-30fps-f37",
+      "split": "dev",
+      "source": "synthetic:bounce?size=640x360&fps=30&frames=90&impact=37",
+      "clock": {
+        "rate": {
+          "num": 30,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "impact",
+        "subject": {
+          "x": 64,
+          "y": 158,
+          "w": 43,
+          "h": 44
+        }
+      },
+      "prompt": "A ball is pulled sideways toward a wall on the right of the frame. At 0f it is inside the box x=64, y=158, w=43, h=44 (pixels). At which frame does the ball first touch the wall?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 37,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "impact-24fps-f18",
+      "split": "dev",
+      "source": "synthetic:bounce?size=640x360&fps=24&frames=72&impact=18",
+      "clock": {
+        "rate": {
+          "num": 24,
+          "den": 1
+        },
+        "frames": 72
+      },
+      "givens": {
+        "_tag": "impact",
+        "subject": {
+          "x": 64,
+          "y": 158,
+          "w": 43,
+          "h": 44
+        }
+      },
+      "prompt": "A ball is pulled sideways toward a wall on the right of the frame. At 0f it is inside the box x=64, y=158, w=43, h=44 (pixels). At which frame does the ball first touch the wall?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 18,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "impact-60fps-f50",
+      "split": "dev",
+      "source": "synthetic:bounce?size=640x360&fps=60&frames=180&impact=50",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 180
+      },
+      "givens": {
+        "_tag": "impact",
+        "subject": {
+          "x": 64,
+          "y": 158,
+          "w": 43,
+          "h": 44
+        }
+      },
+      "prompt": "A ball is pulled sideways toward a wall on the right of the frame. At 0f it is inside the box x=64, y=158, w=43, h=44 (pixels). At which frame does the ball first touch the wall?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 50,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "bounces-1",
+      "split": "dev",
+      "source": "synthetic:bounce?size=640x360&frames=90&impact=30&bounces=1",
+      "clock": {
+        "rate": {
+          "num": 30,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "bounces",
+        "subject": {
+          "x": 64,
+          "y": 158,
+          "w": 43,
+          "h": 44
+        }
+      },
+      "prompt": "A ball is pulled sideways toward a wall on the right of the frame and rebounds off it. At 0f it is inside the box x=64, y=158, w=43, h=44 (pixels). How many times does the ball hit the wall, counting the first hit and the hit where it comes to rest?\n\nEnd your reply with one line `ANSWER: <whole number>`, for example `ANSWER: 4`.",
+      "answer": {
+        "_tag": "count",
+        "value": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "bounces-2",
+      "split": "dev",
+      "source": "synthetic:bounce?size=640x360&frames=90&impact=25&period=30&bounces=2",
+      "clock": {
+        "rate": {
+          "num": 30,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "bounces",
+        "subject": {
+          "x": 64,
+          "y": 158,
+          "w": 43,
+          "h": 44
+        }
+      },
+      "prompt": "A ball is pulled sideways toward a wall on the right of the frame and rebounds off it. At 0f it is inside the box x=64, y=158, w=43, h=44 (pixels). How many times does the ball hit the wall, counting the first hit and the hit where it comes to rest?\n\nEnd your reply with one line `ANSWER: <whole number>`, for example `ANSWER: 4`.",
+      "answer": {
+        "_tag": "count",
+        "value": 2
+      },
+      "followUps": []
+    },
+    {
+      "id": "bounces-3",
+      "split": "dev",
+      "source": "synthetic:bounce?size=640x360&frames=120&impact=20&period=24&decay=0.7&bounces=3",
+      "clock": {
+        "rate": {
+          "num": 30,
+          "den": 1
+        },
+        "frames": 120
+      },
+      "givens": {
+        "_tag": "bounces",
+        "subject": {
+          "x": 64,
+          "y": 158,
+          "w": 43,
+          "h": 44
+        }
+      },
+      "prompt": "A ball is pulled sideways toward a wall on the right of the frame and rebounds off it. At 0f it is inside the box x=64, y=158, w=43, h=44 (pixels). How many times does the ball hit the wall, counting the first hit and the hit where it comes to rest?\n\nEnd your reply with one line `ANSWER: <whole number>`, for example `ANSWER: 4`.",
+      "answer": {
+        "_tag": "count",
+        "value": 3
+      },
+      "followUps": []
+    },
+    {
+      "id": "bounces-4",
+      "split": "dev",
+      "source": "synthetic:bounce?size=640x360&frames=120&impact=20&period=24&decay=0.7&bounces=4",
+      "clock": {
+        "rate": {
+          "num": 30,
+          "den": 1
+        },
+        "frames": 120
+      },
+      "givens": {
+        "_tag": "bounces",
+        "subject": {
+          "x": 64,
+          "y": 158,
+          "w": 43,
+          "h": 44
+        }
+      },
+      "prompt": "A ball is pulled sideways toward a wall on the right of the frame and rebounds off it. At 0f it is inside the box x=64, y=158, w=43, h=44 (pixels). How many times does the ball hit the wall, counting the first hit and the hit where it comes to rest?\n\nEnd your reply with one line `ANSWER: <whole number>`, for example `ANSWER: 4`.",
+      "answer": {
+        "_tag": "count",
+        "value": 4
+      },
+      "followUps": []
+    },
+    {
+      "id": "bounces-5",
+      "split": "heldout",
+      "source": "synthetic:bounce?size=640x360&frames=120&impact=20&period=24&decay=0.7&bounces=5",
+      "clock": {
+        "rate": {
+          "num": 30,
+          "den": 1
+        },
+        "frames": 120
+      },
+      "givens": {
+        "_tag": "bounces",
+        "subject": {
+          "x": 64,
+          "y": 158,
+          "w": 43,
+          "h": 44
+        }
+      },
+      "prompt": "A ball is pulled sideways toward a wall on the right of the frame and rebounds off it. At 0f it is inside the box x=64, y=158, w=43, h=44 (pixels). How many times does the ball hit the wall, counting the first hit and the hit where it comes to rest?\n\nEnd your reply with one line `ANSWER: <whole number>`, for example `ANSWER: 4`.",
+      "answer": {
+        "_tag": "count",
+        "value": 5
+      },
+      "followUps": []
+    },
+    {
+      "id": "bounces-6",
+      "split": "dev",
+      "source": "synthetic:bounce?size=640x360&frames=120&impact=15&period=20&decay=0.75&bounces=6",
+      "clock": {
+        "rate": {
+          "num": 30,
+          "den": 1
+        },
+        "frames": 120
+      },
+      "givens": {
+        "_tag": "bounces",
+        "subject": {
+          "x": 64,
+          "y": 158,
+          "w": 43,
+          "h": 44
+        }
+      },
+      "prompt": "A ball is pulled sideways toward a wall on the right of the frame and rebounds off it. At 0f it is inside the box x=64, y=158, w=43, h=44 (pixels). How many times does the ball hit the wall, counting the first hit and the hit where it comes to rest?\n\nEnd your reply with one line `ANSWER: <whole number>`, for example `ANSWER: 4`.",
+      "answer": {
+        "_tag": "count",
+        "value": 6
+      },
+      "followUps": []
+    },
+    {
+      "id": "easing-linear-30fps",
+      "split": "dev",
+      "source": "synthetic:ease?size=640x360&fps=30&frames=90&easing=linear&start=10&end=70",
+      "clock": {
+        "rate": {
+          "num": 30,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "easing",
+        "subject": {
+          "x": 64,
+          "y": 144,
+          "w": 72,
+          "h": 72
+        }
+      },
+      "prompt": "A square moves from left to right once. At 0f it is inside the box x=64, y=144, w=72, h=72 (pixels). Which easing curve does its horizontal motion follow?\n\nEnd your reply with one line `ANSWER: <label>`, where the label is one of linear, ease-in, ease-out, ease-in-out, spring.",
+      "answer": {
+        "_tag": "label",
+        "value": "linear"
+      },
+      "followUps": []
+    },
+    {
+      "id": "easing-linear-24fps",
+      "split": "dev",
+      "source": "synthetic:ease?size=640x360&fps=24&frames=72&easing=linear&start=6&end=48",
+      "clock": {
+        "rate": {
+          "num": 24,
+          "den": 1
+        },
+        "frames": 72
+      },
+      "givens": {
+        "_tag": "easing",
+        "subject": {
+          "x": 64,
+          "y": 144,
+          "w": 72,
+          "h": 72
+        }
+      },
+      "prompt": "A square moves from left to right once. At 0f it is inside the box x=64, y=144, w=72, h=72 (pixels). Which easing curve does its horizontal motion follow?\n\nEnd your reply with one line `ANSWER: <label>`, where the label is one of linear, ease-in, ease-out, ease-in-out, spring.",
+      "answer": {
+        "_tag": "label",
+        "value": "linear"
+      },
+      "followUps": []
+    },
+    {
+      "id": "easing-ease-in-30fps",
+      "split": "dev",
+      "source": "synthetic:ease?size=640x360&fps=30&frames=90&easing=ease-in&start=10&end=70",
+      "clock": {
+        "rate": {
+          "num": 30,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "easing",
+        "subject": {
+          "x": 64,
+          "y": 144,
+          "w": 72,
+          "h": 72
+        }
+      },
+      "prompt": "A square moves from left to right once. At 0f it is inside the box x=64, y=144, w=72, h=72 (pixels). Which easing curve does its horizontal motion follow?\n\nEnd your reply with one line `ANSWER: <label>`, where the label is one of linear, ease-in, ease-out, ease-in-out, spring.",
+      "answer": {
+        "_tag": "label",
+        "value": "ease-in"
+      },
+      "followUps": []
+    },
+    {
+      "id": "easing-ease-in-24fps",
+      "split": "heldout",
+      "source": "synthetic:ease?size=640x360&fps=24&frames=72&easing=ease-in&start=6&end=48",
+      "clock": {
+        "rate": {
+          "num": 24,
+          "den": 1
+        },
+        "frames": 72
+      },
+      "givens": {
+        "_tag": "easing",
+        "subject": {
+          "x": 64,
+          "y": 144,
+          "w": 72,
+          "h": 72
+        }
+      },
+      "prompt": "A square moves from left to right once. At 0f it is inside the box x=64, y=144, w=72, h=72 (pixels). Which easing curve does its horizontal motion follow?\n\nEnd your reply with one line `ANSWER: <label>`, where the label is one of linear, ease-in, ease-out, ease-in-out, spring.",
+      "answer": {
+        "_tag": "label",
+        "value": "ease-in"
+      },
+      "followUps": []
+    },
+    {
+      "id": "easing-ease-out-30fps",
+      "split": "heldout",
+      "source": "synthetic:ease?size=640x360&fps=30&frames=90&easing=ease-out&start=10&end=70",
+      "clock": {
+        "rate": {
+          "num": 30,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "easing",
+        "subject": {
+          "x": 64,
+          "y": 144,
+          "w": 72,
+          "h": 72
+        }
+      },
+      "prompt": "A square moves from left to right once. At 0f it is inside the box x=64, y=144, w=72, h=72 (pixels). Which easing curve does its horizontal motion follow?\n\nEnd your reply with one line `ANSWER: <label>`, where the label is one of linear, ease-in, ease-out, ease-in-out, spring.",
+      "answer": {
+        "_tag": "label",
+        "value": "ease-out"
+      },
+      "followUps": []
+    },
+    {
+      "id": "easing-ease-out-24fps",
+      "split": "dev",
+      "source": "synthetic:ease?size=640x360&fps=24&frames=72&easing=ease-out&start=6&end=48",
+      "clock": {
+        "rate": {
+          "num": 24,
+          "den": 1
+        },
+        "frames": 72
+      },
+      "givens": {
+        "_tag": "easing",
+        "subject": {
+          "x": 64,
+          "y": 144,
+          "w": 72,
+          "h": 72
+        }
+      },
+      "prompt": "A square moves from left to right once. At 0f it is inside the box x=64, y=144, w=72, h=72 (pixels). Which easing curve does its horizontal motion follow?\n\nEnd your reply with one line `ANSWER: <label>`, where the label is one of linear, ease-in, ease-out, ease-in-out, spring.",
+      "answer": {
+        "_tag": "label",
+        "value": "ease-out"
+      },
+      "followUps": []
+    },
+    {
+      "id": "easing-ease-in-out-30fps",
+      "split": "dev",
+      "source": "synthetic:ease?size=640x360&fps=30&frames=90&easing=ease-in-out&start=10&end=70",
+      "clock": {
+        "rate": {
+          "num": 30,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "easing",
+        "subject": {
+          "x": 64,
+          "y": 144,
+          "w": 72,
+          "h": 72
+        }
+      },
+      "prompt": "A square moves from left to right once. At 0f it is inside the box x=64, y=144, w=72, h=72 (pixels). Which easing curve does its horizontal motion follow?\n\nEnd your reply with one line `ANSWER: <label>`, where the label is one of linear, ease-in, ease-out, ease-in-out, spring.",
+      "answer": {
+        "_tag": "label",
+        "value": "ease-in-out"
+      },
+      "followUps": []
+    },
+    {
+      "id": "easing-ease-in-out-24fps",
+      "split": "dev",
+      "source": "synthetic:ease?size=640x360&fps=24&frames=72&easing=ease-in-out&start=6&end=48",
+      "clock": {
+        "rate": {
+          "num": 24,
+          "den": 1
+        },
+        "frames": 72
+      },
+      "givens": {
+        "_tag": "easing",
+        "subject": {
+          "x": 64,
+          "y": 144,
+          "w": 72,
+          "h": 72
+        }
+      },
+      "prompt": "A square moves from left to right once. At 0f it is inside the box x=64, y=144, w=72, h=72 (pixels). Which easing curve does its horizontal motion follow?\n\nEnd your reply with one line `ANSWER: <label>`, where the label is one of linear, ease-in, ease-out, ease-in-out, spring.",
+      "answer": {
+        "_tag": "label",
+        "value": "ease-in-out"
+      },
+      "followUps": []
+    },
+    {
+      "id": "easing-spring-30fps",
+      "split": "dev",
+      "source": "synthetic:ease?size=640x360&fps=30&frames=90&easing=spring(170,12)&start=10&end=70",
+      "clock": {
+        "rate": {
+          "num": 30,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "easing",
+        "subject": {
+          "x": 64,
+          "y": 144,
+          "w": 72,
+          "h": 72
+        }
+      },
+      "prompt": "A square moves from left to right once. At 0f it is inside the box x=64, y=144, w=72, h=72 (pixels). Which easing curve does its horizontal motion follow?\n\nEnd your reply with one line `ANSWER: <label>`, where the label is one of linear, ease-in, ease-out, ease-in-out, spring.",
+      "answer": {
+        "_tag": "label",
+        "value": "spring"
+      },
+      "followUps": []
+    },
+    {
+      "id": "easing-spring-24fps",
+      "split": "dev",
+      "source": "synthetic:ease?size=640x360&fps=24&frames=72&easing=spring(120,10)&start=6&end=48",
+      "clock": {
+        "rate": {
+          "num": 24,
+          "den": 1
+        },
+        "frames": 72
+      },
+      "givens": {
+        "_tag": "easing",
+        "subject": {
+          "x": 64,
+          "y": 144,
+          "w": 72,
+          "h": 72
+        }
+      },
+      "prompt": "A square moves from left to right once. At 0f it is inside the box x=64, y=144, w=72, h=72 (pixels). Which easing curve does its horizontal motion follow?\n\nEnd your reply with one line `ANSWER: <label>`, where the label is one of linear, ease-in, ease-out, ease-in-out, spring.",
+      "answer": {
+        "_tag": "label",
+        "value": "spring"
+      },
+      "followUps": []
+    },
+    {
+      "id": "flicker-f12",
+      "split": "dev",
+      "source": "synthetic:flicker?size=640x360&frames=90&at=12&gain=60",
+      "clock": {
+        "rate": {
+          "num": 30,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "flicker"
+      },
+      "prompt": "This clip is a still shot, except the whole picture flickers for a single frame. At which frame does the flicker happen?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 12,
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "flicker-f45-faint",
+      "split": "heldout",
+      "source": "synthetic:flicker?size=640x360&frames=90&at=45&gain=40",
+      "clock": {
+        "rate": {
+          "num": 30,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "flicker"
+      },
+      "prompt": "This clip is a still shot, except the whole picture flickers for a single frame. At which frame does the flicker happen?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 45,
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "flicker-f70-strong",
+      "split": "dev",
+      "source": "synthetic:flicker?size=640x360&frames=90&at=70&gain=90",
+      "clock": {
+        "rate": {
+          "num": 30,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "flicker"
+      },
+      "prompt": "This clip is a still shot, except the whole picture flickers for a single frame. At which frame does the flicker happen?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 70,
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "flicker-24fps-f30",
+      "split": "dev",
+      "source": "synthetic:flicker?size=640x360&fps=24&frames=72&at=30&gain=50",
+      "clock": {
+        "rate": {
+          "num": 24,
+          "den": 1
+        },
+        "frames": 72
+      },
+      "givens": {
+        "_tag": "flicker"
+      },
+      "prompt": "This clip is a still shot, except the whole picture flickers for a single frame. At which frame does the flicker happen?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 30,
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "flicker-60fps-dark",
+      "split": "heldout",
+      "source": "synthetic:flicker?size=640x360&fps=60&frames=120&at=97&gain=-60",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 120
+      },
+      "givens": {
+        "_tag": "flicker"
+      },
+      "prompt": "This clip is a still shot, except the whole picture flickers for a single frame. At which frame does the flicker happen?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 97,
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "safe-area-10pct-f54",
+      "split": "dev",
+      "source": "synthetic:safe-area?size=640x360&frames=90&margin=10&exit=54",
+      "clock": {
+        "rate": {
+          "num": 30,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "safe-area",
+        "subject": {
+          "x": 293,
+          "y": 153,
+          "w": 54,
+          "h": 54
+        },
+        "marginPercent": 10
+      },
+      "prompt": "A box drifts to the right. At 0f it is inside x=293, y=153, w=54, h=54 (pixels). The safe area is inset 10% from each edge of the frame. What is the first frame where any part of the box is outside the safe area?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 54,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "safe-area-5pct-f60",
+      "split": "heldout",
+      "source": "synthetic:safe-area?size=640x360&frames=90&margin=5&exit=60",
+      "clock": {
+        "rate": {
+          "num": 30,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "safe-area",
+        "subject": {
+          "x": 293,
+          "y": 153,
+          "w": 54,
+          "h": 54
+        },
+        "marginPercent": 5
+      },
+      "prompt": "A box drifts to the right. At 0f it is inside x=293, y=153, w=54, h=54 (pixels). The safe area is inset 5% from each edge of the frame. What is the first frame where any part of the box is outside the safe area?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 60,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "safe-area-10pct-f30",
+      "split": "heldout",
+      "source": "synthetic:safe-area?size=640x360&frames=60&margin=10&exit=30",
+      "clock": {
+        "rate": {
+          "num": 30,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "safe-area",
+        "subject": {
+          "x": 293,
+          "y": 153,
+          "w": 54,
+          "h": 54
+        },
+        "marginPercent": 10
+      },
+      "prompt": "A box drifts to the right. At 0f it is inside x=293, y=153, w=54, h=54 (pixels). The safe area is inset 10% from each edge of the frame. What is the first frame where any part of the box is outside the safe area?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 30,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "safe-area-24fps-5pct",
+      "split": "dev",
+      "source": "synthetic:safe-area?size=640x360&fps=24&frames=72&margin=5&exit=40",
+      "clock": {
+        "rate": {
+          "num": 24,
+          "den": 1
+        },
+        "frames": 72
+      },
+      "givens": {
+        "_tag": "safe-area",
+        "subject": {
+          "x": 293,
+          "y": 153,
+          "w": 54,
+          "h": 54
+        },
+        "marginPercent": 5
+      },
+      "prompt": "A box drifts to the right. At 0f it is inside x=293, y=153, w=54, h=54 (pixels). The safe area is inset 5% from each edge of the frame. What is the first frame where any part of the box is outside the safe area?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 40,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "safe-area-60fps-10pct",
+      "split": "dev",
+      "source": "synthetic:safe-area?size=640x360&fps=60&frames=150&margin=10&exit=100",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 150
+      },
+      "givens": {
+        "_tag": "safe-area",
+        "subject": {
+          "x": 293,
+          "y": 153,
+          "w": 54,
+          "h": 54
+        },
+        "marginPercent": 10
+      },
+      "prompt": "A box drifts to the right. At 0f it is inside x=293, y=153, w=54, h=54 (pixels). The safe area is inset 10% from each edge of the frame. What is the first frame where any part of the box is outside the safe area?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 100,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "cut-hard-f45",
+      "split": "dev",
+      "source": "synthetic:cut?size=640x360&frames=90&at=45",
+      "clock": {
+        "rate": {
+          "num": 30,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "cut"
+      },
+      "prompt": "This clip joins two different shots. At which frame does the second shot begin (for a cross-dissolve, the first frame where the second shot starts showing)?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 45,
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "cut-hard-f23",
+      "split": "dev",
+      "source": "synthetic:cut?size=640x360&frames=90&at=23",
+      "clock": {
+        "rate": {
+          "num": 30,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "cut"
+      },
+      "prompt": "This clip joins two different shots. At which frame does the second shot begin (for a cross-dissolve, the first frame where the second shot starts showing)?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 23,
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "cut-hard-24fps-f70",
+      "split": "dev",
+      "source": "synthetic:cut?size=640x360&fps=24&frames=96&at=70",
+      "clock": {
+        "rate": {
+          "num": 24,
+          "den": 1
+        },
+        "frames": 96
+      },
+      "givens": {
+        "_tag": "cut"
+      },
+      "prompt": "This clip joins two different shots. At which frame does the second shot begin (for a cross-dissolve, the first frame where the second shot starts showing)?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 70,
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "cut-fade6-f40",
+      "split": "heldout",
+      "source": "synthetic:cut?size=640x360&frames=90&at=40&fade=6",
+      "clock": {
+        "rate": {
+          "num": 30,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "cut"
+      },
+      "prompt": "This clip joins two different shots. At which frame does the second shot begin (for a cross-dissolve, the first frame where the second shot starts showing)?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 40,
+        "tolerance": 6
+      },
+      "followUps": []
+    },
+    {
+      "id": "cut-fade10-f30",
+      "split": "dev",
+      "source": "synthetic:cut?size=640x360&frames=90&at=30&fade=10",
+      "clock": {
+        "rate": {
+          "num": 30,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "cut"
+      },
+      "prompt": "This clip joins two different shots. At which frame does the second shot begin (for a cross-dissolve, the first frame where the second shot starts showing)?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 30,
+        "tolerance": 10
+      },
+      "followUps": []
+    },
+    {
+      "id": "dropped-default",
+      "split": "dev",
+      "source": "synthetic:dropped?size=640x360&frames=90",
+      "clock": {
+        "rate": {
+          "num": 30,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "dropped"
+      },
+      "prompt": "A square moves smoothly across the frame, but some frames repeat the picture of the frame before them. Which frames are the repeats?\n\nEnd your reply with one line listing every such frame, `ANSWER: <address>, <address>, ...`, for example `ANSWER: #12, #40`.",
+      "answer": {
+        "_tag": "frames",
+        "indices": [23, 45, 68],
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "dropped-single",
+      "split": "heldout",
+      "source": "synthetic:dropped?size=640x360&frames=90&dups=12",
+      "clock": {
+        "rate": {
+          "num": 30,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "dropped"
+      },
+      "prompt": "A square moves smoothly across the frame, but some frames repeat the picture of the frame before them. Which frames are the repeats?\n\nEnd your reply with one line listing every such frame, `ANSWER: <address>, <address>, ...`, for example `ANSWER: #12, #40`.",
+      "answer": {
+        "_tag": "frames",
+        "indices": [12],
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "dropped-pair",
+      "split": "dev",
+      "source": "synthetic:dropped?size=640x360&frames=90&dups=20,45,46",
+      "clock": {
+        "rate": {
+          "num": 30,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "dropped"
+      },
+      "prompt": "A square moves smoothly across the frame, but some frames repeat the picture of the frame before them. Which frames are the repeats?\n\nEnd your reply with one line listing every such frame, `ANSWER: <address>, <address>, ...`, for example `ANSWER: #12, #40`.",
+      "answer": {
+        "_tag": "frames",
+        "indices": [20, 45, 46],
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "dropped-24fps",
+      "split": "dev",
+      "source": "synthetic:dropped?size=640x360&fps=24&frames=72&dups=30,60",
+      "clock": {
+        "rate": {
+          "num": 24,
+          "den": 1
+        },
+        "frames": 72
+      },
+      "givens": {
+        "_tag": "dropped"
+      },
+      "prompt": "A square moves smoothly across the frame, but some frames repeat the picture of the frame before them. Which frames are the repeats?\n\nEnd your reply with one line listing every such frame, `ANSWER: <address>, <address>, ...`, for example `ANSWER: #12, #40`.",
+      "answer": {
+        "_tag": "frames",
+        "indices": [30, 60],
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "dropped-run",
+      "split": "dev",
+      "source": "synthetic:dropped?size=640x360&frames=90&dups=5,50,51,52",
+      "clock": {
+        "rate": {
+          "num": 30,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "dropped"
+      },
+      "prompt": "A square moves smoothly across the frame, but some frames repeat the picture of the frame before them. Which frames are the repeats?\n\nEnd your reply with one line listing every such frame, `ANSWER: <address>, <address>, ...`, for example `ANSWER: #12, #40`.",
+      "answer": {
+        "_tag": "frames",
+        "indices": [5, 50, 51, 52],
+        "tolerance": 0
+      },
+      "followUps": []
+    }
+  ]
+}

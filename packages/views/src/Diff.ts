@@ -1,4 +1,11 @@
-import { type FrameIndex, InvalidInput, type KymoError, type Source, frameIndex } from "@kymo/core"
+import {
+  type Address,
+  type FrameIndex,
+  InvalidInput,
+  type KymoError,
+  type Source,
+  frameIndex
+} from "@kymo/core"
 import { type Target, paginate } from "@kymo/layout"
 import { Effect } from "effect"
 import type { ViewResult } from "./Output.ts"
@@ -14,6 +21,7 @@ export interface DiffOptions extends Paging {
   readonly frames: ReadonlyArray<FrameIndex>
   readonly outDir: string
   readonly target: Target
+  readonly labelStyle: Address.LabelStyle
 }
 
 /** What changed since the previous frame, as heatmaps (black = no change), written as `<span>.diff.png`. */
@@ -31,7 +39,7 @@ export const diff = Effect.fn("diff")(function* (o: DiffOptions): Effect.fn.Retu
       items: o.frames.length,
       frame: size,
       target: o.target,
-      labelChars: Math.max(...o.frames.map((i) => frameLabel(timeline, i, false).length)),
+      labelChars: Math.max(...o.frames.map((i) => frameLabel(timeline, i, o.labelStyle, false).length)),
       cursor: o.cursor,
       maxSheets: o.maxSheets
     })
@@ -59,7 +67,7 @@ export const diff = Effect.fn("diff")(function* (o: DiffOptions): Effect.fn.Retu
               rect: plan.cells[k]!.frame
             })),
             overlay: plan.cells
-              .map((cell, k) => label(cell.label, frameLabel(timeline, indices[k]!, false)))
+              .map((cell, k) => label(cell.label, frameLabel(timeline, indices[k]!, o.labelStyle, false)))
               .join("")
           }
         }

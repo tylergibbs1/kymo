@@ -115,6 +115,40 @@ describe("frame-timing rules", () => {
     })
   )
 
+  it.effect("finds a three-frame stall inside motion", () =>
+    Effect.gen(function* () {
+      // Moves 1px/frame but holds frames 40..42 on frame 39's picture, then jumps ahead.
+      const stalled = fakeSource({
+        frames: 60,
+        scene: (i) => shotA(4 + (i >= 40 && i <= 42 ? 39 : i))
+      })
+      const range = yield* FrameRange.whole(stalled.timeline)
+      const report = yield* check({ source: stalled, range, rules: ["duplicate-frames"] })
+      expect(report.findings.map((f) => [f.index, f.span ?? null])).toEqual([[40, "01s10f..01s12f"]])
+    })
+  )
+
+  it.effect("does not call a still shot or a pause a held frame", () =>
+    Effect.gen(function* () {
+      // A still shot with a one-frame flash in the middle, then a square that moves, pauses for 20
+      // frames and moves on. Neither still stretch is a duplicated frame.
+      const scene = (i: number): Scene =>
+        i < 60
+          ? i === 30
+            ? white
+            : shotA(4)
+          : i < 70
+            ? shotA(4 + (i - 60))
+            : i < 90
+              ? shotA(14)
+              : shotA(14 + (i - 90))
+      const still = fakeSource({ frames: 100, scene })
+      const range = yield* FrameRange.whole(still.timeline)
+      const report = yield* check({ source: still, range, rules: ["duplicate-frames"] })
+      expect(report.findings).toEqual([])
+    })
+  )
+
   it.effect("rejects pixel rules on a source without pixels", () =>
     Effect.gen(function* () {
       const telemetry = fakeSource({ frames: 10, scene: () => black, size: null })

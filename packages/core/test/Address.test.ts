@@ -33,6 +33,9 @@ describe("format", () => {
     expect(Address.format(r30, 20)).toBe("20f")
     expect(Address.format(r30, 3600 * 30 + 1)).toBe("1h01f")
     expect(Address.label(r30, 250)).toBe("08s10f #250")
+    expect(Address.styledLabel(r30, 250, "both")).toBe("08s10f #250")
+    expect(Address.styledLabel(r30, 250, "timecode")).toBe("08s10f")
+    expect(Address.styledLabel(r30, 250, "index")).toBe("#250")
     expect(Address.spanName(r30, 0, 250)).toBe("0f-08s10f")
   })
 

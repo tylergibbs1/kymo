@@ -1,4 +1,4 @@
-import { Address } from "@kymo/core"
+import { Address, fpsOf } from "@kymo/core"
 import type { Cuts } from "./Cuts.ts"
 import { type Finding, finding } from "./Finding.ts"
 import { STILL_FLOOR } from "./Motion.ts"
@@ -13,6 +13,8 @@ export interface PixelInput {
 
 /** At most this much change counts as a repeated frame (codec noise included). */
 const DUPLICATE = 0.0005
+/** Longest repeat, in seconds, that counts as a held or stalled frame; anything longer is a pause. */
+const MAX_HELD_SECONDS = 0.25
 /** Mean luma below this is black. */
 const BLACK = 0.03
 /** A flicker steps luma at least this much and then comes back. */
@@ -50,11 +52,12 @@ export const duplicateFrames = (input: PixelInput): Array<Finding> => {
   const m = shotMotion(input)
   // Repeated black frames are black-frames' finding, not a held frame.
   const isDup = m.map((v, k) => v !== undefined && v <= DUPLICATE && input.scan.frames[k]!.luma >= BLACK)
+  const moving = (v: number | undefined): v is number => v !== undefined && v > STILL_FLOOR
   return runs(isDup).flatMap(([a, b]) => {
-    const around = [m[a - 2], m[a - 1], m[b + 1], m[b + 2]].filter(
-      (v): v is number => v !== undefined && v > DUPLICATE
-    )
-    if (around.length < 2 || median(around) <= STILL_FLOOR) return []
+    // A held frame is a short repeat inside motion that carries on through it. A longer still
+    // stretch is a pause, and a still shot next to one bright frame is not moving at all.
+    if (b - a + 1 > Math.max(1, Math.round(MAX_HELD_SECONDS * fpsOf(range.rate)))) return []
+    if (!moving(m[a - 1]) || !moving(m[b + 1])) return []
     const first = range.first + a
     const last = range.first + b
     const count = b - a + 1

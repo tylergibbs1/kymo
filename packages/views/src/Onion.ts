@@ -1,8 +1,8 @@
-import { Address, type FrameIndex, type KymoError, type Source } from "@kymo/core"
+import { type Address, type FrameIndex, type KymoError, type Source } from "@kymo/core"
 import { type Target, planGrid } from "@kymo/layout"
 import { Effect } from "effect"
 import type { ViewImage } from "./Output.ts"
-import { checkFrames, frameRef, frameSize, readFrames, spanOf } from "./internal/Frames.ts"
+import { checkFrames, frameRef, frameSize, readFrames, spanLabel, spanOf } from "./internal/Frames.ts"
 import { writeImage } from "./internal/Pages.ts"
 import { onionSkin } from "./internal/Pixels.ts"
 import { label } from "./internal/Svg.ts"
@@ -18,12 +18,13 @@ export interface OnionOptions {
   readonly frames: ReadonlyArray<FrameIndex>
   readonly outDir: string
   readonly target: Target
+  readonly labelStyle: Address.LabelStyle
 }
 
 /**
  * Several frames blended into one image: the static background once, each frame's moving
  * pixels on top, older ones tinted and fainter, the newest at full strength. Shows path and
- * spacing. Written as `<span>.onion.png`, labelled `0f-08s10f #0-#250`.
+ * spacing. Written as `<span>.onion.png`, labelled `0f-08s10f #0-#250` (by label style).
  */
 export const onion = Effect.fn("onion")(function* (o: OnionOptions): Effect.fn.Return<ViewImage, KymoError> {
   const { timeline } = o.source
@@ -31,7 +32,7 @@ export const onion = Effect.fn("onion")(function* (o: OnionOptions): Effect.fn.R
   const size = yield* frameSize(o.source)
   const first = o.frames[0]!
   const last = o.frames[o.frames.length - 1]!
-  const text = `${Address.spanName(timeline.rate, first, last)} #${first}-#${last}`
+  const text = spanLabel(timeline, first, last, o.labelStyle)
   const plan = yield* Effect.fromResult(
     planGrid({ count: 1, frame: size, target: o.target, labelChars: text.length })
   )

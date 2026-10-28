@@ -65,9 +65,25 @@ export const frameRef = (timeline: Timeline, frame: DecodedFrame): FrameRef => (
   t: frame.t
 })
 
-/** `08s10f #250`, or `clip1@08s10f #250` with the handle. */
-export const frameLabel = (timeline: Timeline, index: number, withHandle: boolean): string =>
-  `${withHandle ? `${timeline.handle}@` : ""}${Address.label(timeline.rate, index)}`
+/** `08s10f #250` (or `08s10f`, `#250` by style), prefixed `clip1@` with the handle. */
+export const frameLabel = (
+  timeline: Timeline,
+  index: number,
+  style: Address.LabelStyle,
+  withHandle: boolean
+): string => `${withHandle ? `${timeline.handle}@` : ""}${Address.styledLabel(timeline.rate, index, style)}`
+
+/** A run of frames: `0f-08s10f #0-#250`, `0f-08s10f` or `#0-#250` by style. */
+export const spanLabel = (
+  timeline: Timeline,
+  first: number,
+  last: number,
+  style: Address.LabelStyle
+): string => {
+  const timecode = Address.spanName(timeline.rate, first, last)
+  const index = first === last ? `#${first}` : `#${first}-#${last}`
+  return style === "timecode" ? timecode : style === "index" ? index : `${timecode} ${index}`
+}
 
 /** Span of a list in reading order: `0f-08s10f`. */
 export const spanOf = (timeline: Timeline, indices: ReadonlyArray<number>): string =>

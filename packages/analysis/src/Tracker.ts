@@ -61,6 +61,13 @@ export interface TrackOptions {
 
 /** Below this match quality the region counts as lost for that frame. */
 const LOST = 0.5
+/**
+ * A template whose pixels vary less than this (variance in grey levels², i.e. a 3-level standard
+ * deviation) is flat: what structure it has is resampling ripple, which correlates as noise.
+ */
+const FLAT_VARIANCE = 9
+/** A flat region closer than this (0..255) to its surroundings cannot be told apart from them. */
+const MIN_CONTRAST = 8
 /** At or above this, the template is refreshed from the new match. */
 const REFRESH = 0.8
 
@@ -89,8 +96,27 @@ const sad = (g: Gray, t: Patch, x: number, y: number, limit: number): number => 
   return s
 }
 
-/** Normalised cross-correlation mapped to 0..1; for flat patches, 1 minus the mean difference. */
-const quality = (a: Patch, b: Patch): number => {
+/** Mean of the ring `width` px wide just outside a w×h patch at (x, y), clipped to the frame. */
+const ringMean = (g: Gray, x: number, y: number, w: number, h: number, width = 2): number => {
+  let sum = 0
+  let n = 0
+  for (let r = Math.max(0, y - width); r < Math.min(g.height, y + h + width); r++) {
+    for (let c = Math.max(0, x - width); c < Math.min(g.width, x + w + width); c++) {
+      if (r >= y && r < y + h && c >= x && c < x + w) continue
+      sum += g.data[r * g.width + c]!
+      n++
+    }
+  }
+  return n === 0 ? Number.NaN : sum / n
+}
+
+/**
+ * Match quality, 0..1: normalised cross-correlation of template `a` and `patch`. A flat template
+ * (a plain square) has no structure to correlate, so it scores by its mean difference relative to
+ * its contrast with the surroundings `ring`: soft, sub-pixel edges cost little, bare background
+ * scores 0.
+ */
+const quality = (a: Patch, b: Patch, ring: number): number => {
   const n = a.data.length
   let ma = 0
   let mb = 0
@@ -112,10 +138,9 @@ const quality = (a: Patch, b: Patch): number => {
     db += y * y
     diff += Math.abs(a.data[i]! - b.data[i]!)
   }
-  const flat = 1e-6 * n
-  return da < flat || db < flat
-    ? Math.max(0, 1 - diff / (n * 255) / 0.1)
-    : Math.max(0, num / Math.sqrt(da * db))
+  if (da >= FLAT_VARIANCE * n && db > 0) return Math.max(0, num / Math.sqrt(da * db))
+  const contrast = Number.isNaN(ring) ? 255 : Math.abs(ma - ring)
+  return contrast < MIN_CONTRAST ? 0 : Math.max(0, 1 - diff / n / contrast)
 }
 
 /** Offset of a parabola's vertex through (-1, a), (0, b), (1, c), in -0.5..0.5. */
@@ -138,13 +163,17 @@ const match = (g: Gray, s: State, baseRadius: number) => {
   const { template: t } = s
   const maxX = g.width - t.w
   const maxY = g.height - t.h
+  // Search around the last position, widened by the current speed, so continuing, stopping and
+  // reversing (a bounce) all stay inside the window. The constant-velocity prediction only breaks ties.
   const px = Math.round(s.x + s.vx)
   const py = Math.round(s.y + s.vy)
+  const rx = s.radius + Math.ceil(Math.abs(s.vx))
+  const ry = s.radius + Math.ceil(Math.abs(s.vy))
   let best = Infinity
   let bx = Math.max(0, Math.min(maxX, px))
   let by = Math.max(0, Math.min(maxY, py))
-  for (let y = Math.max(0, py - s.radius); y <= Math.min(maxY, py + s.radius); y++) {
-    for (let x = Math.max(0, px - s.radius); x <= Math.min(maxX, px + s.radius); x++) {
+  for (let y = Math.max(0, s.y - ry); y <= Math.min(maxY, s.y + ry); y++) {
+    for (let x = Math.max(0, s.x - rx); x <= Math.min(maxX, s.x + rx); x++) {
       const v = sad(g, t, x, y, best)
       if (v < best || (v === best && Math.hypot(x - px, y - py) < Math.hypot(bx - px, by - py))) {
         best = v
@@ -158,7 +187,8 @@ const match = (g: Gray, s: State, baseRadius: number) => {
   const sx = vertex(at(bx - 1, by), best, at(bx + 1, by))
   const sy = vertex(at(bx, by - 1), best, at(bx, by + 1))
   const patch = cut(g, bx, by, t.w, t.h)
-  const q = quality(t, patch)
+  const ring = ringMean(g, bx, by, t.w, t.h)
+  const q = quality(t, patch, ring)
   if (q < LOST) {
     s.radius = Math.min(4 * baseRadius, s.radius * 2)
     s.vx = 0
@@ -171,14 +201,14 @@ const match = (g: Gray, s: State, baseRadius: number) => {
   s.y = by
   s.radius = baseRadius
   // Re-anchor on the original appearance when it still matches; otherwise follow the new look.
-  if (quality(s.original, patch) >= REFRESH) s.template = s.original
+  if (quality(s.original, patch, ring) >= REFRESH) s.template = s.original
   else if (q >= REFRESH) s.template = patch
   return { x: bx + sx, y: by + sy, q }
 }
 
 /**
  * Follow `box` (source px, at `range.first`) through `range` by template matching
- * on grayscale: SAD inside a search window around the predicted position,
+ * on grayscale: SAD inside a search window around the last position, widened by speed,
  * sub-pixel refinement, and template refresh while the match is good.
  */
 export const trackRegion = (

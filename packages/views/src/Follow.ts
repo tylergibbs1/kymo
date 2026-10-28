@@ -36,6 +36,7 @@ export interface FollowOptions extends Paging {
   readonly box: FollowBox
   readonly outDir: string
   readonly target: Target
+  readonly labelStyle: Address.LabelStyle
   /** Overlay source-pixel coordinates on each crop. */
   readonly pixelGrid?: boolean
 }
@@ -79,7 +80,7 @@ export const follow = Effect.fn("follow")(function* (
             if (cx === undefined || cx === null || cy === undefined || cy === null)
               return Effect.fail(
                 new InvalidInput({
-                  message: `Tracks ${box.x}/${box.y} have no position at ${Address.label(timeline.rate, i)}.`,
+                  message: `Tracks ${box.x}/${box.y} have no position at ${Address.styledLabel(timeline.rate, i, o.labelStyle)}.`,
                   hint: "Follow only frames where the object is tracked, or use a Fixed box."
                 })
               )
@@ -97,7 +98,7 @@ export const follow = Effect.fn("follow")(function* (
       items: items.length,
       frame: { width: box.width, height: box.height },
       target: o.target,
-      labelChars: Math.max(...o.frames.map((i) => frameLabel(timeline, i, false).length)),
+      labelChars: Math.max(...o.frames.map((i) => frameLabel(timeline, i, o.labelStyle, false).length)),
       cursor: o.cursor,
       maxSheets: o.maxSheets
     })
@@ -134,7 +135,7 @@ export const follow = Effect.fn("follow")(function* (
         overlay: plan.cells
           .map(
             (cell, k) =>
-              label(cell.label, frameLabel(timeline, indices[k]!, false)) +
+              label(cell.label, frameLabel(timeline, indices[k]!, o.labelStyle, false)) +
               (o.pixelGrid ? pixelGrid(cell.frame, page[k]!.region) : "")
           )
           .join("")

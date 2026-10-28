@@ -1,4 +1,4 @@
-import type { FrameIndex, KymoError, Source } from "@kymo/core"
+import type { Address, FrameIndex, KymoError, Source } from "@kymo/core"
 import { type Cursor, type Target, paginate } from "@kymo/layout"
 import { Effect } from "effect"
 import type { ViewResult } from "./Output.ts"
@@ -20,6 +20,7 @@ export interface SheetOptions extends Paging {
   readonly frames: ReadonlyArray<FrameIndex>
   readonly outDir: string
   readonly target: Target
+  readonly labelStyle: Address.LabelStyle
   /** Label as `clip1@08s10f #250` instead of `08s10f #250`. */
   readonly withHandle?: boolean
   /** Overlay lines every 100 source pixels with coordinates, for orientation. */
@@ -32,7 +33,7 @@ export const sheet = Effect.fn("sheet")(function* (o: SheetOptions): Effect.fn.R
   yield* checkFrames(o.source, o.frames)
   const size = yield* frameSize(o.source)
   const withHandle = o.withHandle ?? false
-  const labels = o.frames.map((i) => frameLabel(timeline, i, withHandle))
+  const labels = o.frames.map((i) => frameLabel(timeline, i, o.labelStyle, withHandle))
   const pages = yield* Effect.fromResult(
     paginate({
       items: o.frames.length,
@@ -59,7 +60,7 @@ export const sheet = Effect.fn("sheet")(function* (o: SheetOptions): Effect.fn.R
         overlay: plan.cells
           .map(
             (cell, k) =>
-              label(cell.label, frameLabel(timeline, indices[k]!, withHandle)) +
+              label(cell.label, frameLabel(timeline, indices[k]!, o.labelStyle, withHandle)) +
               (o.pixelGrid ? pixelGrid(cell.frame, { x: 0, y: 0, ...size }) : "")
           )
           .join("")

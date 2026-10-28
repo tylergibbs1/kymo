@@ -1,0 +1,19 @@
+{
+  "name": "@kymo/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "kymo": "./bin/kymo.js"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@effect/platform-node": "4.0.7",
+    "@kymo/core": "*",
+    "@kymo/mcp": "*",
+    "effect": "4.0.7",
+    "kymo": "*"
+  }
+}

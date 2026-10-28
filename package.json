@@ -8,11 +8,14 @@
     "eval"
   ],
   "scripts": {
+    "kymo": "node apps/cli/bin/kymo.js",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "eval": "tsx eval/src/main.ts",
+    "eval:smoke": "tsx eval/src/main.ts run --model oracle --split all --per-family 1"
   },
   "dependencies": {
     "@effect/platform-node": "^4.0.7",

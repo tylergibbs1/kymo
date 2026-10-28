@@ -39,7 +39,7 @@ describe("sheet", () => {
       const dir = yield* tempDir
       const source = fakeSource()
       const frames = indices(0, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250)
-      const result = yield* sheet({ source, frames, outDir: dir, target: standard })
+      const result = yield* sheet({ source, frames, outDir: dir, labelStyle: "both", target: standard })
       expect(result.next).toBeNull()
       expect(result.images).toHaveLength(1)
       const image = result.images[0]!
@@ -57,11 +57,32 @@ describe("sheet", () => {
       const meta = yield* Effect.promise(() => sharp(image.path).metadata())
       expect([meta.width, meta.height]).toEqual([image.width, image.height])
       const first = yield* Effect.promise(() => readFile(image.path))
-      yield* sheet({ source, frames, outDir: dir, target: standard })
+      yield* sheet({ source, frames, outDir: dir, labelStyle: "both", target: standard })
       const second = yield* Effect.promise(() => readFile(image.path))
       expect(Buffer.compare(first, second)).toBe(0)
       // Frames are requested at the planned size, not decoded full size.
       expect(source.reads[0]).toBe(Math.max(plan.success.frame.width, plan.success.frame.height))
+    }).pipe(Effect.scoped)
+  )
+
+  it.effect("draws labels in the style asked for, with the same frames and file name", () =>
+    Effect.gen(function* () {
+      const source = fakeSource()
+      const frames = indices(0, 125, 250)
+      const draw = (labelStyle: Address.LabelStyle) =>
+        Effect.gen(function* () {
+          const dir = yield* tempDir
+          const [image] = (yield* sheet({ source, frames, outDir: dir, labelStyle, target: standard })).images
+          return { image: image!, bytes: yield* Effect.promise(() => readFile(image!.path)) }
+        })
+      const both = yield* draw("both")
+      const styles = [yield* draw("timecode"), yield* draw("index")]
+      for (const other of styles) {
+        expect(basename(other.image.path)).toBe(basename(both.image.path))
+        expect(other.image.frames).toEqual(both.image.frames)
+        expect(Buffer.compare(other.bytes, both.bytes)).not.toBe(0)
+      }
+      expect(Buffer.compare(styles[0]!.bytes, styles[1]!.bytes)).not.toBe(0)
     }).pipe(Effect.scoped)
   )
 
@@ -70,13 +91,21 @@ describe("sheet", () => {
       const dir = yield* tempDir
       const source = fakeSource({ width: 1920, height: 1080 })
       const frames = Array.from({ length: 30 }, (_, i) => frameIndex(i * 3))
-      const first = yield* sheet({ source, frames, outDir: dir, target: highRes, maxSheets: 2 })
+      const first = yield* sheet({
+        source,
+        frames,
+        outDir: dir,
+        labelStyle: "both",
+        target: highRes,
+        maxSheets: 2
+      })
       expect(first.images).toHaveLength(2)
       expect(first.next).not.toBeNull()
       const rest = yield* sheet({
         source,
         frames,
         outDir: dir,
+        labelStyle: "both",
         target: highRes,
         cursor: first.next ?? undefined
       })
@@ -94,7 +123,13 @@ describe("sheet", () => {
     Effect.gen(function* () {
       const dir = yield* tempDir
       const e = yield* Effect.flip(
-        sheet({ source: fakeSource(), frames: indices(5000), outDir: dir, target: standard })
+        sheet({
+          source: fakeSource(),
+          frames: indices(5000),
+          outDir: dir,
+          labelStyle: "both",
+          target: standard
+        })
       )
       expect(e._tag).toBe("AddressOutOfRange")
     }).pipe(Effect.scoped)
@@ -135,6 +170,7 @@ describe("diff", () => {
         source: still,
         frames: indices(10),
         outDir: dir,
+        labelStyle: "both",
         target: standard
       })).images
       expect(basename(stillImage!.path)).toBe("10f.diff.png")
@@ -146,6 +182,7 @@ describe("diff", () => {
         source: moving,
         frames: indices(10),
         outDir: dir,
+        labelStyle: "both",
         target: standard
       })).images
       expect(brightest(yield* pixels(movingImage!.path), 0, 0, 320, 180)).toBeGreaterThan(100)
@@ -156,7 +193,13 @@ describe("diff", () => {
     Effect.gen(function* () {
       const dir = yield* tempDir
       const e = yield* Effect.flip(
-        diff({ source: fakeSource(), frames: indices(0, 5), outDir: dir, target: standard })
+        diff({
+          source: fakeSource(),
+          frames: indices(0, 5),
+          outDir: dir,
+          labelStyle: "both",
+          target: standard
+        })
       )
       expect(e._tag).toBe("InvalidInput")
     }).pipe(Effect.scoped)
@@ -169,7 +212,9 @@ describe("onion", () => {
       const dir = yield* tempDir
       const source = fakeSource({ squareX: (i) => i * 5 })
       const frames = indices(0, 10, 20, 30, 40)
-      const image = yield* sameBytesOnRerun(onion({ source, frames, outDir: dir, target: standard }))
+      const image = yield* sameBytesOnRerun(
+        onion({ source, frames, outDir: dir, labelStyle: "both", target: standard })
+      )
       expect(basename(image.path)).toBe("0f-01s10f.onion.png")
       expect(image.frames).toHaveLength(5)
       const img = yield* pixels(image.path)
@@ -190,7 +235,7 @@ describe("filmstrip", () => {
     Effect.gen(function* () {
       const dir = yield* tempDir
       const source = fakeSource()
-      const result = yield* filmstrip({ source, count: 6, outDir: dir, target: highRes })
+      const result = yield* filmstrip({ source, count: 6, outDir: dir, labelStyle: "both", target: highRes })
       const image = result.images[0]!
       expect(image.frames.map((f) => f.index)).toEqual([0, 60, 120, 179, 239, 299])
       expect(basename(image.path)).toBe("0f-09s29f.filmstrip.png")
@@ -207,11 +252,19 @@ describe("compare", () => {
       const a = fakeSource()
       const b = fakeSource({ handle: "clip2" })
       const frames = indices(0, 50, 250)
-      const side = yield* compare({ a, b, frames, outDir: dir, target: standard })
+      const side = yield* compare({ a, b, frames, outDir: dir, labelStyle: "both", target: standard })
       expect(basename(side.images[0]!.path)).toBe("0f-08s10f.compare.clip1.clip2.png")
       const sideImg = yield* pixels(side.images[0]!.path)
       expect(sideImg.width).toBeGreaterThanOrEqual(2 * 320)
-      const d = yield* compare({ a, b, frames, outDir: dir, target: standard, mode: "diff" })
+      const d = yield* compare({
+        a,
+        b,
+        frames,
+        outDir: dir,
+        labelStyle: "both",
+        target: standard,
+        mode: "diff"
+      })
       expect(basename(d.images[0]!.path)).toBe("0f-08s10f.compare-diff.clip1.clip2.png")
       const plan = planGrid({
         count: 3,
@@ -237,6 +290,7 @@ describe("follow", () => {
         frames: indices(0, 30, 60),
         box: { _tag: "Tracked", x: "x", y: "y", width: 80, height: 60 },
         outDir: dir,
+        labelStyle: "both",
         target: highRes
       })
       const image = result.images[0]!
@@ -266,6 +320,7 @@ describe("follow", () => {
           frames: indices(0),
           box: { _tag: "Fixed", x: 300, y: 0, width: 80, height: 60 },
           outDir: dir,
+          labelStyle: "both",
           target: standard
         })
       )

@@ -1,4 +1,4 @@
-import { type FrameIndex, type KymoError, type Source } from "@kymo/core"
+import { type Address, type FrameIndex, type KymoError, type Source } from "@kymo/core"
 import { type Target, paginate } from "@kymo/layout"
 import { Effect } from "effect"
 import type { ViewResult } from "./Output.ts"
@@ -20,6 +20,7 @@ export interface CompareOptions extends Paging {
   readonly mode?: CompareMode
   readonly outDir: string
   readonly target: Target
+  readonly labelStyle: Address.LabelStyle
 }
 
 /**
@@ -39,8 +40,8 @@ export const compare = Effect.fn("compare")(function* (
   yield* frameSize(o.b)
   const labelsFor = (i: number): ReadonlyArray<string> =>
     mode === "diff"
-      ? [`${ta.handle}-${tb.handle}@${frameLabel(ta, i, false)}`]
-      : [frameLabel(ta, i, true), frameLabel(tb, i, true)]
+      ? [`${ta.handle}-${tb.handle}@${frameLabel(ta, i, o.labelStyle, false)}`]
+      : [frameLabel(ta, i, o.labelStyle, true), frameLabel(tb, i, o.labelStyle, true)]
   const pages = yield* Effect.fromResult(
     paginate({
       items: o.frames.length,

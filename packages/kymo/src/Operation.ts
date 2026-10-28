@@ -1,0 +1,154 @@
+import { BackendFailure, InvalidInput, type KymoError } from "@kymo/core"
+import type { Workspace } from "@kymo/sources"
+import { Effect, Schema } from "effect"
+import type { FrameLabels } from "./FrameLabels.ts"
+import type { OutputDir } from "./OutputDir.ts"
+import type { Sheet } from "./Sheets.ts"
+
+/** What every operation needs from its environment. `KymoLive` provides all of it. */
+export type KymoServices = Workspace | OutputDir | FrameLabels
+
+type Codec<T> = Schema.Codec<T, unknown, never, never>
+
+/**
+ * One kymo operation. The input and output Schemas are the single source of truth: CLI flags and
+ * `--json`, `kymo schema`, and MCP `inputSchema`/`outputSchema` are all derived from them.
+ */
+export interface Operation<
+  I extends Codec<unknown> = Codec<unknown>,
+  O extends Codec<unknown> = Codec<unknown>
+> {
+  /** `frames`; the MCP tool is `kymo_frames`. */
+  readonly name: string
+  /** A short human title, e.g. "Look at frames". */
+  readonly title: string
+  /** What it is for and when to use it instead of its neighbour; shown in CLI help and MCP. */
+  readonly description: string
+  /** What one call can cost in images, e.g. "≤4 images, ≤4784 visual tokens each at high-res". */
+  readonly cost: string
+  /** Typed against the Schema, so an example that stops decoding is a compile error. */
+  readonly examples: ReadonlyArray<I["Encoded"]>
+  readonly input: I
+  readonly output: O
+  /** False only for operations that change the world (record). */
+  readonly readOnly: boolean
+  /** The CLI prints this array one JSON line per item, then one line with the remaining fields. */
+  readonly lines?: "sheets" | "findings"
+  /** The images a result carries, in order, for shells that attach them (MCP). */
+  images?(output: O["Type"]): ReadonlyArray<Sheet>
+  run(input: I["Type"]): Effect.Effect<O["Type"], KymoError, KymoServices>
+}
+
+export type AnyOperation = Operation<Codec<unknown>, Codec<unknown>>
+
+export const define = <I extends Codec<unknown>, O extends Codec<unknown>>(
+  op: Operation<I, O>
+): Operation<I, O> => op
+
+/** Unknown keys are errors: a typo silently falling back to a default is the worst failure. */
+const parseOptions = { onExcessProperty: "error", errors: "all" } as const
+
+/** `Expected string\n  at ["source"]` → `source: expected string`; an unknown key → `x: is not a field`. */
+const formatIssues = (message: string): string => {
+  const lines = message.split("\n")
+  const issues: Array<string> = []
+  for (let k = 0; k < lines.length; k++) {
+    const line = lines[k]!.trim()
+    if (line.length === 0 || line.startsWith("at [")) continue
+    const at = /^at \[(.*)\]$/.exec(lines[k + 1]?.trim() ?? "")
+    const path = at ? at[1]!.replace(/"/g, "").replace(/,/g, ".") : ""
+    const what =
+      line === "Expected no excess property"
+        ? "is not a field"
+        : `${line.charAt(0).toLowerCase()}${line.slice(1)}`
+    const text = `${path ? `${path}: ` : ""}${what}`
+    if (!issues.includes(text)) issues.push(text)
+  }
+  return issues.join("; ")
+}
+
+/** Decode raw input (CLI `--json`, flags, MCP arguments, library calls) with the operation's Schema. */
+export const decodeInput = <I extends Codec<unknown>, O extends Codec<unknown>>(
+  op: Operation<I, O>,
+  raw: unknown
+): Effect.Effect<I["Type"], InvalidInput> =>
+  Schema.decodeUnknownEffect(op.input)(raw, parseOptions).pipe(
+    Effect.mapError(
+      (error) =>
+        new InvalidInput({
+          message: `Invalid ${op.name} input: ${formatIssues(error.message)}.`,
+          hint: `Run \`kymo schema ${op.name}\` for every field. Example: ${JSON.stringify(op.examples[0] ?? {})}`
+        })
+    )
+  )
+
+/** The JSON form of an output, exactly as the output Schema describes it. */
+export const encodeOutput = <I extends Codec<unknown>, O extends Codec<unknown>>(
+  op: Operation<I, O>,
+  value: O["Type"]
+): Effect.Effect<unknown, BackendFailure> =>
+  Schema.encodeUnknownEffect(op.output)(value).pipe(
+    Effect.mapError(
+      (error) =>
+        new BackendFailure({
+          message: `kymo produced a ${op.name} result that does not match its own schema: ${formatIssues(error.message)}.`,
+          hint: "This is a kymo bug; report it with the command that failed."
+        })
+    )
+  )
+
+/** Decode, run, encode: raw JSON in, JSON out. What every shell calls. */
+export const execute = <I extends Codec<unknown>, O extends Codec<unknown>>(
+  op: Operation<I, O>,
+  raw: unknown
+): Effect.Effect<unknown, KymoError, KymoServices> =>
+  decodeInput(op, raw).pipe(
+    Effect.flatMap((input) => op.run(input)),
+    Effect.flatMap((output) => encodeOutput(op, output))
+  )
+
+/** JSON Schema (draft 2020-12) of a Schema's encoded side, with every definition inlined under `$defs`. */
+export const jsonSchema = (schema: Schema.Top): Record<string, unknown> => {
+  const doc = Schema.toJsonSchemaDocument(schema, { onExcessProperty: "error" })
+  const defs = doc.definitions
+  const root = doc.schema as Record<string, unknown>
+  const ref = typeof root["$ref"] === "string" ? root["$ref"].replace("#/$defs/", "") : undefined
+  if (ref !== undefined && defs[ref] !== undefined) {
+    const rest = Object.fromEntries(Object.entries(defs).filter(([k]) => k !== ref))
+    const inlined = defs[ref] as Record<string, unknown>
+    return Object.keys(rest).length === 0 ? inlined : { ...inlined, $defs: rest }
+  }
+  return Object.keys(defs).length === 0 ? root : { ...root, $defs: defs }
+}
+
+export interface ObjectSchema {
+  readonly type: "object"
+  readonly properties: Readonly<Record<string, Record<string, unknown>>>
+  readonly required: ReadonlyArray<string>
+  readonly [key: string]: unknown
+}
+
+/**
+ * An input's JSON Schema as one object, for consumers that need an object root (MCP tool inputs,
+ * CLI flags). A union of shapes (`at` or `range`) is merged: every property of every shape, required
+ * only when every shape requires it. The Schema itself still rejects mixing shapes.
+ */
+export const flatInputSchema = (op: AnyOperation): ObjectSchema => {
+  const { anyOf, ...root } = jsonSchema(op.input)
+  const shapes = (Array.isArray(anyOf) ? anyOf : [root]) as ReadonlyArray<{
+    readonly properties?: Record<string, Record<string, unknown>>
+    readonly required?: ReadonlyArray<string>
+  }>
+  const properties: Record<string, Record<string, unknown>> = {}
+  for (const shape of shapes) for (const [k, v] of Object.entries(shape.properties ?? {})) properties[k] ??= v
+  const required = Object.keys(properties).filter((k) => shapes.every((s) => s.required?.includes(k)))
+  return { ...root, type: "object", properties, required, additionalProperties: false }
+}
+
+/** `{input, output}` JSON Schemas for one operation, as `kymo schema <op>` prints them. */
+export const schemasOf = (op: AnyOperation) => ({
+  name: op.name,
+  description: op.description,
+  input: jsonSchema(op.input),
+  output: jsonSchema(op.output)
+})

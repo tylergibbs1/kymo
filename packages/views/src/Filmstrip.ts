@@ -27,6 +27,7 @@ export interface FilmstripOptions extends Paging {
   readonly count?: number
   readonly outDir: string
   readonly target: Target
+  readonly labelStyle: Address.LabelStyle
 }
 
 /** `count` frames spread evenly over [first, last], both ends included, without repeats. */
@@ -43,6 +44,7 @@ const MINOR_PER_GAP = 4
 /** One ruler under a row: a baseline, a major tick at each frame's centre with its label, minor ticks between. */
 const ruler = (
   timeline: Timeline,
+  style: Address.LabelStyle,
   row: ReadonlyArray<{ readonly cell: Cell; readonly index: number }>
 ): string => {
   const left = row[0]!.cell.label
@@ -57,7 +59,7 @@ const ruler = (
     out += text(
       x,
       top + TICK_MAJOR_PX + (bar.height - TICK_MAJOR_PX - 4) / 2,
-      Address.label(timeline.rate, index),
+      Address.styledLabel(timeline.rate, index, style),
       {
         size: LABEL_FONT_PX,
         anchor: "middle"
@@ -73,12 +75,17 @@ const ruler = (
   return out
 }
 
-const rulers = (timeline: Timeline, plan: SheetPlan, indices: ReadonlyArray<number>): string =>
+const rulers = (
+  timeline: Timeline,
+  style: Address.LabelStyle,
+  plan: SheetPlan,
+  indices: ReadonlyArray<number>
+): string =>
   Array.from({ length: plan.rows }, (_, r) =>
     plan.cells.flatMap((cell, k) => (cell.row === r ? [{ cell, index: indices[k]! }] : []))
   )
     .filter((row) => row.length > 0)
-    .map((row) => ruler(timeline, row))
+    .map((row) => ruler(timeline, style, row))
     .join("")
 
 /**
@@ -110,7 +117,7 @@ export const filmstrip = Effect.fn("filmstrip")(function* (
       items: frames.length,
       frame: size,
       target: o.target,
-      labelChars: Math.max(...frames.map((i) => Address.label(timeline.rate, i).length)),
+      labelChars: Math.max(...frames.map((i) => Address.styledLabel(timeline.rate, i, o.labelStyle).length)),
       bar: "ruler",
       cursor: o.cursor,
       maxSheets: o.maxSheets
@@ -129,7 +136,7 @@ export const filmstrip = Effect.fn("filmstrip")(function* (
         width: plan.width,
         height: plan.height,
         tiles: decoded.map((f, k) => ({ image: f.image, rect: plan.cells[k]!.frame })),
-        overlay: rulers(timeline, plan, indices)
+        overlay: rulers(timeline, o.labelStyle, plan, indices)
       }
     }))
   )

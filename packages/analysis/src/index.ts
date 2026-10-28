@@ -1,6 +1,7 @@
 export { FrameRange, frameRef } from "./Range.ts"
 export { type FrameStat, type Scan, SCAN_MAX_EDGE, scan } from "./Scan.ts"
 export { Cut, Cuts, detectCuts } from "./Cuts.ts"
+export { FrameDifference, frameDifferences } from "./Difference.ts"
 export { MOTION_TRACK, Motion, MotionPeak, MotionWindow, motionEnergy } from "./Motion.ts"
 export { Budget, type SampleRequest, SampleStrategy, parseBudget, sample } from "./Sampling.ts"
 export { Box, RegionTrack, type TrackOptions, parseBox, trackRegion } from "./Tracker.ts"
