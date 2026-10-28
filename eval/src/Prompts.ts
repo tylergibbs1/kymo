@@ -11,6 +11,7 @@ import {
   type UiGivens,
   isUiGivens
 } from "./Task.ts"
+import { visibleRule } from "./ui/Measure.ts"
 
 const box = (b: Box) => `x=${b.x}, y=${b.y}, w=${b.w}, h=${b.h}`
 
@@ -58,9 +59,9 @@ const pointAt = (element: string, s: Subject) =>
 const uiQuestion = (givens: UiGivens): string => {
   switch (givens._tag) {
     case "ui-start":
-      return `${UI} A ${givens.element} animates in. ${pointAt(givens.element, givens.subject)} At which frame does the ${givens.element} first visibly change (move or fade)?`
+      return `${UI} A ${givens.element} animates in. ${pointAt(givens.element, givens.subject)} At which frame does the ${givens.element} first visibly change, that is, differ from 0f by ${visibleRule}?`
     case "ui-settle":
-      return `${UI} A ${givens.element} animates in. ${pointAt(givens.element, givens.subject)} At which frame has it finished animating, that is, the first frame from which it no longer visibly changes?`
+      return `${UI} A ${givens.element} animates in. ${pointAt(givens.element, givens.subject)} At which frame has it finished animating, that is, the first frame from which it stays within its final state: no frame after it differs from the last frame by ${visibleRule}?`
     case "ui-easing":
       return `${UI} A ${givens.element} moves once. At 0f it is inside the box ${box(givens.subject)} (pixels). Which easing curve does its motion follow?`
     case "ui-overshoot":
@@ -78,7 +79,7 @@ const uiQuestion = (givens: UiGivens): string => {
     case "ui-reverse":
       return `${UI} A progress bar fills from left to right; its knob is at ${box(givens.subject)} (pixels) at 0f. At one point the progress goes backwards for a moment. At which frame is the knob first further left than in the frame before?`
     case "ui-compare":
-      return `${UI} The same sheet opens twice, side by side: before on the left (at 0f inside ${box(givens.left)}) and after on the right (at 0f inside ${box(givens.right)}). Each finishes animating at the first frame from which it no longer visibly changes. How many frames sooner does the right one finish than the left one? Answer a negative number if the right one finishes later.`
+      return `${UI} The same sheet opens twice, side by side: before on the left (at 0f inside ${box(givens.left)}) and after on the right (at 0f inside ${box(givens.right)}). Each finishes animating at the first frame from which no later frame differs from its final state by ${visibleRule}. How many frames sooner does the right one finish than the left one? Answer a negative number if the right one finishes later.`
   }
 }
 

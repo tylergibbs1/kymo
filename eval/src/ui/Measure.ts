@@ -21,7 +21,16 @@ export interface State {
 }
 
 /** Opacity change that counts as much as one pixel of movement. */
-const OPACITY_PER_PIXEL = 1 / 50
+export const OPACITY_PER_PIXEL = 1 / 50
+
+/**
+ * The change that counts as visible: this many pixels of movement, or the equivalent opacity change.
+ * Questions quote it (`visibleRule`), so the prompt and the key measure the same thing.
+ */
+export const VISIBLE_PX = 1
+
+/** The visibility rule as the questions state it. */
+export const visibleRule = `moving by at least ${VISIBLE_PX} px or changing opacity by at least ${Math.round(VISIBLE_PX * OPACITY_PER_PIXEL * 100)}%`
 
 interface Clipped {
   readonly x0: number
@@ -62,14 +71,14 @@ export interface Located {
   readonly tolerance: number
 }
 
-/** The answer at a 1 px threshold, with a tolerance covering where 0.5 px and 2 px would put it. */
+/** The answer at `VISIBLE_PX`, with a tolerance covering where half and twice that would put it. */
 const located = (
   at: (threshold: number) => number | undefined,
   minTolerance: number
 ): Located | undefined => {
-  const index = at(1)
-  const lo = at(0.5)
-  const hi = at(2)
+  const index = at(VISIBLE_PX)
+  const lo = at(VISIBLE_PX / 2)
+  const hi = at(VISIBLE_PX * 2)
   if (index === undefined || lo === undefined || hi === undefined) return undefined
   return { index, tolerance: Math.max(minTolerance, Math.abs(lo - index), Math.abs(hi - index)) }
 }
