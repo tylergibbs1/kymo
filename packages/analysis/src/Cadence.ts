@@ -23,6 +23,9 @@ const PROBE_PERIODS = 6
 /** At most this share of the events in a cadence's span may fall outside it (stray repeats, say). */
 const MAX_STRAYS = 0.1
 
+/** Once a clip shows one event every `period` frames, this many events whole periods apart elsewhere are the same cadence. */
+const MIN_CHAIN = 3
+
 const residue = (k: number, period: number) => ((k % period) + period) % period
 
 /** The positions within `period` that carry events in the `PROBE_PERIODS` periods from `start`. */
@@ -136,7 +139,36 @@ export const cadences = (
     const key = `${c.period}/${c.perPeriod}`
     byPattern.set(key, [...(byPattern.get(key) ?? []), c])
   }
-  return [...byPattern.values()]
-    .flatMap((same) => merge(same, free))
+  const merged = [...byPattern.values()].flatMap((same) => merge(same, free))
+  // The longest cadences take in chains first.
+  return merged
+    .sort((a, b) => b.events.length - a.events.length)
+    .map((c) => takeInChains(c, free))
     .sort((a, b) => a.events[0]! - b.events[0]!)
+}
+
+/**
+ * A conversion runs through the whole clip, but where the picture barely moves (a fade, a slow shot)
+ * only some of its events show, too few for a cadence on their own. Once the clip shows one event every
+ * `period` frames, unclaimed events in chains of at least `MIN_CHAIN`, each a whole number of periods
+ * (at most `MAX_MISSED_PERIODS`) after the one before, belong to it. Lone events stay out.
+ */
+const takeInChains = (c: Cadence, free: Array<boolean>): Cadence => {
+  if (c.perPeriod !== 1) return c
+  const taken: Array<number> = []
+  let chain: Array<number> = []
+  const close = () => {
+    if (chain.length >= MIN_CHAIN) taken.push(...chain)
+    chain = []
+  }
+  for (let k = 0; k < free.length; k++) {
+    if (!free[k]) continue
+    const last = chain[chain.length - 1]
+    if (last !== undefined && ((k - last) % c.period !== 0 || k - last > MAX_MISSED_PERIODS * c.period))
+      close()
+    chain.push(k)
+  }
+  close()
+  for (const e of taken) free[e] = false
+  return taken.length === 0 ? c : { ...c, events: [...c.events, ...taken].sort((a, b) => a - b) }
 }
