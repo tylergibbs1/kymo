@@ -3,16 +3,30 @@
  *
  *   address  := [handle "@"] point | range
  *   point    := timecode | "#" int | seconds | "-" timecode | "now" ["-" timecode] | "@" marker [("+"|"-") timecode]
- *   timecode := [int "h"] [int "m"] [int "s"] [int "f"]      08s10f · 01m05s · 0f
+ *   timecode := [int "h"] [int "m"] [int "s"] [int "f"]      08s10f · 01m05s · 02m00s24f · 0f
  *   seconds  := number "s" | number "ms"                     8.33s · 500ms
  *   range    := point ".." point [":" step]                  2s..4s:2f · #0..#90:10
  *
  * `parse` turns text into an Address; `resolve` turns an Address into frame
  * indices against one Timeline; `format` is the canonical inverse.
+ *
+ * On a constant-rate clock a timecode counts frames (`08s10f` is 8 × base + 10 frames). On a
+ * variable-rate clock (see `variableRate`) seconds are time and frames are frames: `16s`, `8.33s`
+ * and `-2s` name the frame on screen at that time, while `5f`, `-1f`, `@cut1+5f` and `:2f` count
+ * decoded frames. `format` then writes the frame's own start time (`16.04s`), so a label never
+ * disagrees with the frame's `t`.
  */
 import { Effect, Result, Schema } from "effect"
 import { AddressOutOfRange, AddressParseError, NotSeekable } from "./Errors.ts"
-import { type FrameIndex, type Rate, frameIndex, indexAtSeconds, timecodeBase } from "./Rate.ts"
+import {
+  type FrameIndex,
+  type Rate,
+  clockOf,
+  frameIndex,
+  indexAtSeconds,
+  secondsAt,
+  timecodeBase
+} from "./Rate.ts"
 
 /** A length of time, as written. Converted to frames only once a Rate is known. */
 export type Span =
@@ -75,6 +89,9 @@ const parseSpan = (text: string): Span | undefined => {
   return undefined
 }
 
+const isZero = (span: Span): boolean =>
+  span._tag === "Seconds" ? span.seconds === 0 : span.h + span.m + span.s + span.f === 0
+
 const parsePoint = (text: string, whole: string): Result.Result<Point, AddressParseError> => {
   if (text.startsWith("#")) {
     const digits = text.slice(1)
@@ -129,6 +146,7 @@ export const parse = (input: string): Result.Result<Address, AddressParseError> 
       ? { _tag: "Timecode", h: 0, m: 0, s: 0, f: Number(stepText) }
       : parseSpan(stepText)
     if (!step) return Result.fail(fail(text, `The step "${stepText}" is not a length like 2f or 0.5s`))
+    if (isZero(step)) return Result.fail(fail(text, `A step of ${stepText} never advances; use 1f or more`))
   }
   const from = parsePoint(fromText, text)
   if (Result.isFailure(from)) return Result.fail(from.failure)
@@ -140,30 +158,45 @@ export const parse = (input: string): Result.Result<Address, AddressParseError> 
 export const parseEffect = (input: string): Effect.Effect<Address, AddressParseError> =>
   Effect.fromResult(parse(input))
 
-/** Number of frames in a span at a rate. */
+/** Number of frames in a span on a constant-rate clock (on a variable one, the average rate's). */
 export const spanFrames = (rate: Rate, span: Span): number =>
   span._tag === "Timecode"
     ? ((span.h * 60 + span.m) * 60 + span.s) * timecodeBase(rate) + span.f
-    : indexAtSeconds(rate, span.seconds)
+    : Math.round((span.seconds * rate.num) / rate.den)
+
+/** `16s`, `16.04s`, `0.5s`: a time to the millisecond, as a variable-rate clock writes its frames. */
+const formatSeconds = (t: number): string => {
+  const ms = Math.round(t * 1000)
+  const frac = String(ms % 1000)
+    .padStart(3, "0")
+    .replace(/0+$/, "")
+  return `${Math.floor(ms / 1000)}${frac.length > 0 ? `.${frac}` : ""}s`
+}
+
+const UNITS = ["h", "m", "s", "f"] as const
 
 /**
- * Canonical timecode for a frame index: zero segments dropped, units kept.
- * `08s10f`, `01m05s`, `0f`. Minutes and seconds are two digits; frames are
- * padded only when they follow another segment.
+ * Canonical address of a frame index. Constant rate: a timecode with zero segments dropped at either
+ * end but kept in between, so a segment never reads as another unit: `08s10f`, `01m05s`,
+ * `02m00s24f` (not `02m24f`), `0f`. Minutes and seconds are two digits; frames are padded to the
+ * base's width only when they follow another segment. Variable rate: the frame's start time, `16.04s`.
  */
 export const format = (rate: Rate, index: number): string => {
+  if (clockOf(rate) !== undefined) return formatSeconds(secondsAt(rate, index))
   const base = timecodeBase(rate)
-  const f = index % base
   const totalS = Math.floor(index / base)
-  const s = totalS % 60
-  const m = Math.floor(totalS / 60) % 60
-  const h = Math.floor(totalS / 3600)
+  const values = [Math.floor(totalS / 3600), Math.floor(totalS / 60) % 60, totalS % 60, index % base]
+  const first = values.findIndex((v) => v > 0)
+  if (first < 0) return "0f"
+  const last = values.findLastIndex((v) => v > 0)
   const fWidth = Math.max(2, String(base - 1).length)
   const out: Array<string> = []
-  if (h > 0) out.push(`${h}h`)
-  if (m > 0) out.push(`${String(m).padStart(2, "0")}m`)
-  if (s > 0) out.push(`${String(s).padStart(2, "0")}s`)
-  if (f > 0 || out.length === 0) out.push(out.length === 0 ? `${f}f` : `${String(f).padStart(fWidth, "0")}f`)
+  for (let k = first; k <= last; k++) {
+    const v = values[k]!
+    const text =
+      k === 0 || (k === 3 && k === first) ? String(v) : String(v).padStart(k === 3 ? fWidth : 2, "0")
+    out.push(`${text}${UNITS[k]}`)
+  }
   return out.join("")
 }
 
@@ -187,6 +220,13 @@ export const label = (rate: Rate, index: number): string => styledLabel(rate, in
 /** A sheet or file span name: `0f-08s10f`. */
 export const spanName = (rate: Rate, first: number, last: number): string =>
   first === last ? format(rate, first) : `${format(rate, first)}-${format(rate, last)}`
+
+/**
+ * A number of frames as a length: `20f`, `01s` on a constant-rate clock. On a variable one a frame
+ * count is not a time, so it stays a count: `20f`.
+ */
+export const formatLength = (rate: Rate, frames: number): string =>
+  clockOf(rate) === undefined ? format(rate, frames) : `${frames}f`
 
 /** What `resolve` needs to know about a Timeline. Kept narrow so tests need no source. */
 export interface ResolveContext {
@@ -212,22 +252,40 @@ const outOfRange = (ctx: ResolveContext, text: string, index: number) => {
   }
   return new AddressOutOfRange({
     message:
-      index < 0
-        ? `${text} is before the start of ${ctx.handle}. The first frame is 0f.`
-        : `${text} is past the end (duration ${format(ctx.rate, ctx.count)}). The last frame is -1f.`,
+      index < ctx.first
+        ? `${text} is before the start of ${ctx.handle}; the first frame is ${format(ctx.rate, ctx.first)} (#${ctx.first}).`
+        : `${text} is past the end of ${ctx.handle}; the last frame is ${format(ctx.rate, last)} (#${last}), also written -1f.`,
     hint: `Valid frames are ${format(ctx.rate, ctx.first)} (#${ctx.first}) to ${format(ctx.rate, last)} (#${last}).`
   })
+}
+
+/** A span as time and frames: on a variable clock the two move differently. */
+const partsOf = (span: Span): { readonly seconds: number; readonly frames: number } =>
+  span._tag === "Seconds"
+    ? { seconds: span.seconds, frames: 0 }
+    : { seconds: (span.h * 60 + span.m) * 60 + span.s, frames: span.f }
+
+/**
+ * The frame `k` spans after (k > 0) or before (k < 0) frame `from`, which may be the frame count
+ * (the end). Constant rate: frame arithmetic. Variable rate: the seconds move in time, to the frame
+ * on screen then, and the frames count decoded frames from there.
+ */
+const offsetFrom = (rate: Rate, from: number, k: number, span: Span): number => {
+  if (clockOf(rate) === undefined) return from + k * spanFrames(rate, span)
+  const { seconds, frames } = partsOf(span)
+  const at = seconds === 0 ? from : indexAtSeconds(rate, secondsAt(rate, from) + k * seconds)
+  return at + k * frames
 }
 
 const resolvePoint = (ctx: ResolveContext, p: Point, text: string): Result.Result<number, ResolveError> => {
   const end = ctx.first + ctx.count
   switch (p._tag) {
     case "FromStart":
-      return Result.succeed(spanFrames(ctx.rate, p.span))
+      return Result.succeed(offsetFrom(ctx.rate, 0, 1, p.span))
     case "Index":
       return Result.succeed(p.index)
     case "FromEnd":
-      return Result.succeed(end - spanFrames(ctx.rate, p.span))
+      return Result.succeed(offsetFrom(ctx.rate, end, -1, p.span))
     case "Now":
       if (!ctx.live) {
         return Result.fail(
@@ -251,7 +309,7 @@ const resolvePoint = (ctx: ResolveContext, p: Point, text: string): Result.Resul
           })
         )
       }
-      return Result.succeed(marker.index + p.offset * (p.span ? spanFrames(ctx.rate, p.span) : 0))
+      return Result.succeed(p.span ? offsetFrom(ctx.rate, marker.index, p.offset, p.span) : marker.index)
     }
   }
 }
@@ -292,9 +350,13 @@ export const resolve = (
       })
     )
   }
-  const step = spec.step ? Math.max(1, spanFrames(ctx.rate, spec.step)) : 1
-  const out: Array<FrameIndex> = []
-  for (let i: number = a.success; i <= b.success; i += step) out.push(frameIndex(i))
+  const out: Array<FrameIndex> = [a.success]
+  // Step k is measured from the range's start, so a time step cannot drift on a variable clock.
+  for (let k = 1; ; k++) {
+    const i = spec.step ? offsetFrom(ctx.rate, a.success, k, spec.step) : a.success + k
+    if (i > b.success) break
+    if (i > out[out.length - 1]!) out.push(frameIndex(i))
+  }
   return Result.succeed(out)
 }
 

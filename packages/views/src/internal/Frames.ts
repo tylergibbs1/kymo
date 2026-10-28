@@ -45,7 +45,7 @@ export const checkFrames = (
     ? Effect.void
     : Effect.fail(
         new AddressOutOfRange({
-          message: `#${bad} is past the end of ${handle} (duration ${Address.format(rate, frameCount)}).`,
+          message: `#${bad} is past the end of ${handle}; the last frame is ${Address.format(rate, frameCount - 1)} (#${frameCount - 1}).`,
           hint: `Valid frames are 0f (#0) to ${Address.format(rate, frameCount - 1)} (#${frameCount - 1}).`
         })
       )

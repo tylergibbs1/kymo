@@ -1,14 +1,5 @@
 import { NodeServices } from "@effect/platform-node"
-import {
-  BackendFailure,
-  type FrameIndex,
-  InvalidInput,
-  type Rate,
-  RgbImage,
-  type Size,
-  SourceNotFound,
-  secondsAt
-} from "@kymo/core"
+import { BackendFailure, InvalidInput, type Rate, RgbImage, type Size, SourceNotFound } from "@kymo/core"
 import { Context, Effect, FileSystem, Layer, Path, Schema } from "effect"
 import sharp from "sharp"
 import { frameSource, type RegisteredAdapter } from "../Adapter.ts"
@@ -169,15 +160,11 @@ export class ImageSeqAdapter extends Context.Service<ImageSeqAdapter, Registered
           rate: timing.rate,
           frameCount: frames.length,
           size,
-          ...(timing._tag === "Delays" ? { vfrDurationSeconds: timing.total } : {})
+          ...(timing._tag === "Delays" ? { clock: { starts: timing.starts, end: timing.total } } : {})
         })
         return frameSource({
           timeline,
           tracks: [],
-          timeAt:
-            timing._tag === "Delays"
-              ? (i: FrameIndex) => timing.starts[i]!
-              : (i: FrameIndex) => secondsAt(timing.rate, i),
           decode: (i, target) => decodeImage(frames[i]!.file, frames[i]!.page, target),
           concurrency: 4
         })

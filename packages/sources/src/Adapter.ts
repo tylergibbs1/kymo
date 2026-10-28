@@ -1,4 +1,14 @@
-import type { Adapter, FrameIndex, KymoError, RgbImage, Size, Source, Timeline, Track } from "@kymo/core"
+import {
+  type Adapter,
+  type FrameIndex,
+  type KymoError,
+  type RgbImage,
+  type Size,
+  type Source,
+  type Timeline,
+  type Track,
+  secondsAt
+} from "@kymo/core"
 import { Effect, Stream } from "effect"
 import { fitWithin } from "./Resize.ts"
 import { trackLookup } from "./Timeline.ts"
@@ -11,12 +21,11 @@ export interface RegisteredAdapter extends Adapter {
 
 /**
  * A Source for backends that decode one frame at a time. `decode` receives the output size already
- * fitted to `maxEdge`; frames come back in the order requested.
+ * fitted to `maxEdge`; frames come back in the order requested, with `t` read from the timeline's clock.
  */
 export const frameSource = (options: {
   readonly timeline: Timeline
   readonly tracks: ReadonlyArray<Track>
-  readonly timeAt: (index: FrameIndex) => number
   readonly decode: (index: FrameIndex, target: Size) => Effect.Effect<RgbImage, KymoError>
   readonly concurrency?: number
 }): Source => {
@@ -32,7 +41,7 @@ export const frameSource = (options: {
           (index) =>
             Effect.map(options.decode(index, target), (image) => ({
               index,
-              t: options.timeAt(index),
+              t: secondsAt(timeline.rate, index),
               image
             })),
           { concurrency: options.concurrency ?? 1 }

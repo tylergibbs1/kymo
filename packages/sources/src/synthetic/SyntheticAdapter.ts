@@ -1,4 +1,4 @@
-import { InvalidInput, secondsAt } from "@kymo/core"
+import { InvalidInput } from "@kymo/core"
 import { Context, Effect, Layer, Result } from "effect"
 import { frameSource, type RegisteredAdapter } from "../Adapter.ts"
 import { splitQuery } from "../Params.ts"
@@ -61,7 +61,6 @@ export class SyntheticAdapter extends Context.Service<SyntheticAdapter, Register
         return frameSource({
           timeline,
           tracks: model.tracks,
-          timeAt: (i) => secondsAt(clip.rate, i),
           decode: (i, target) => Effect.sync(() => resizeTo(model.render(i), target))
         })
       })

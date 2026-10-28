@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Result, Schema } from "effect"
-import { Address, Marker, frameIndex, rate } from "@kymo/core"
+import { Address, Marker, Rate, frameIndex, rate, secondsAt, variableRate } from "@kymo/core"
 
 const r30 = rate(30)
 const ctx: Address.ResolveContext = {
@@ -31,12 +31,20 @@ describe("format", () => {
     expect(Address.format(r30, 65 * 30)).toBe("01m05s")
     expect(Address.format(r30, 0)).toBe("0f")
     expect(Address.format(r30, 20)).toBe("20f")
-    expect(Address.format(r30, 3600 * 30 + 1)).toBe("1h01f")
+    expect(Address.format(r30, 3600 * 30 + 1)).toBe("1h00m00s01f")
+    expect(Address.format(r30, 3600 * 30)).toBe("1h")
     expect(Address.label(r30, 250)).toBe("08s10f #250")
     expect(Address.styledLabel(r30, 250, "both")).toBe("08s10f #250")
     expect(Address.styledLabel(r30, 250, "timecode")).toBe("08s10f")
     expect(Address.styledLabel(r30, 250, "index")).toBe("#250")
     expect(Address.spanName(r30, 0, 250)).toBe("0f-08s10f")
+  })
+
+  it("keeps the units between the first and last segment, so frames never read as seconds", () => {
+    const r24 = rate(24)
+    expect(Address.format(r24, (2 * 60 + 0) * 24 + 23)).toBe("02m00s23f")
+    expect(Address.format(r30, (2 * 60 + 24) * 30)).toBe("02m24s")
+    expect(Address.format(r30, 3605 * 30)).toBe("1h00m05s")
   })
 
   it("pads frames to the width of the timecode base", () => {
@@ -89,10 +97,21 @@ describe("parse + resolve", () => {
     expect(err("250").message).toContain("#250")
   })
 
-  it("reports out-of-range addresses with the duration and last frame", () => {
+  it("rejects a step that never advances", () => {
+    for (const zero of ["2s..4s:0f", "#0..#9:0", "0f..1s:0s", "0f..1s:0.0s"]) {
+      const e = err(zero)
+      expect(e._tag, zero).toBe("AddressParseError")
+      expect(e.message).toContain("never advances")
+    }
+  })
+
+  it("reports out-of-range addresses by naming the last frame, never a length that reads like one", () => {
     const e = err("08s10f")
     expect(e._tag).toBe("AddressOutOfRange")
-    expect(e.message).toBe("08s10f is past the end (duration 07s12f). The last frame is -1f.")
+    expect(e.message).toBe(
+      "08s10f is past the end of clip1; the last frame is 07s11f (#221), also written -1f."
+    )
+    expect(err("07s12f").message).toContain("the last frame is 07s11f (#221)")
     expect(err("-300f")._tag).toBe("AddressOutOfRange")
     expect(err("#9..#2").hint).toContain("2f..9f")
   })
@@ -109,6 +128,37 @@ describe("parse + resolve", () => {
 
   it("names known markers when one is missing", () => {
     expect(err("@nope").hint).toBe("Markers: @impact.")
+  })
+})
+
+describe("variable-rate clock", () => {
+  // 25 fps with #4..#5 dropped: #4 starts at 0.24 s.
+  const starts = [0, 0.04, 0.08, 0.12, 0.24, 0.28, 0.32]
+  const vfr = variableRate(rate(25), { starts, end: 0.36 })
+  const vctx: Address.ResolveContext = { ...ctx, rate: vfr, count: starts.length, markers: [] }
+  const at = (text: string) => Result.flatMap(Address.parse(text), (a) => Address.resolve(vctx, a))
+
+  it("formats every frame as its start time, and that address resolves back to it", () => {
+    starts.forEach((t, i) => {
+      expect(secondsAt(vfr, i)).toBe(t)
+      expect(at(Address.format(vfr, i))).toEqual(Result.succeed([i]))
+    })
+    expect(Address.format(vfr, 4)).toBe("0.24s")
+    expect(Address.format(vfr, starts.length)).toBe("0.36s")
+    expect(Address.formatLength(vfr, 3)).toBe("3f")
+  })
+
+  it("reads seconds as time on screen and frames as decoded frames", () => {
+    expect(at("0.2s")).toEqual(Result.succeed([3]))
+    expect(at("4f")).toEqual(Result.succeed([4]))
+    expect(at("-1f")).toEqual(Result.succeed([6]))
+    expect(at("0f..0.3s:0.1s")).toEqual(Result.succeed([0, 2, 3, 5]))
+    expect(Result.isFailure(at("0.4s"))).toBe(true)
+  })
+
+  it("is never serialised", () => {
+    expect(JSON.stringify(vfr)).toBe('{"num":25,"den":1}')
+    expect(Schema.encodeSync(Rate)(vfr)).toEqual({ num: 25, den: 1 })
   })
 })
 

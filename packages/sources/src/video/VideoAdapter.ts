@@ -1,4 +1,4 @@
-import { type FrameIndex, SourceNotFound, secondsAt } from "@kymo/core"
+import { SourceNotFound } from "@kymo/core"
 import { NodeServices } from "@effect/platform-node"
 import { Context, Effect, FileSystem, Layer, Path } from "effect"
 import { ChildProcessSpawner } from "effect/process"
@@ -9,7 +9,28 @@ import { locateBinaries } from "./Binaries.ts"
 import { readVideoFrames } from "./Decode.ts"
 import { probe } from "./Probe.ts"
 
-const EXTENSIONS = [".mp4", ".mov", ".webm", ".mkv", ".m4v"]
+/** Containers ffmpeg reads. Claiming is by name only (no I/O); ffprobe decides whether it really opens. */
+const EXTENSIONS = [
+  ".mp4",
+  ".mov",
+  ".webm",
+  ".mkv",
+  ".m4v",
+  ".ogg",
+  ".ogv",
+  ".avi",
+  ".flv",
+  ".wmv",
+  ".asf",
+  ".mpg",
+  ".mpeg",
+  ".ts",
+  ".mts",
+  ".m2ts",
+  ".3gp",
+  ".mxf",
+  ".y4m"
+]
 
 /** Video files via ffprobe (metadata) and ffmpeg (frames). Binaries are found when a file is opened. */
 export class VideoAdapter extends Context.Service<VideoAdapter, RegisteredAdapter>()(
@@ -43,12 +64,11 @@ export class VideoAdapter extends Context.Service<VideoAdapter, RegisteredAdapte
               rate: info.rate,
               frameCount: info.pts.length,
               size: info.size,
-              ...(info.vfr ? { vfrDurationSeconds: info.durationSeconds } : {})
+              ...(info.vfr
+                ? { clock: { starts: info.pts.map((t) => t - first), end: info.durationSeconds } }
+                : {})
             })
-            const timeAt = info.vfr
-              ? (i: FrameIndex) => info.pts[i]! - first
-              : (i: FrameIndex) => secondsAt(info.rate, i)
-            const read = readVideoFrames(spawner, bins, input, info, timeAt)
+            const read = readVideoFrames(spawner, bins, input, info, timeline.rate)
             return {
               timeline,
               track: trackLookup(handle, []),

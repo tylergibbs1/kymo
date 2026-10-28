@@ -4,7 +4,9 @@ import {
   type FrameIndex,
   type KymoError,
   RgbImage,
-  type Size
+  type Rate,
+  type Size,
+  secondsAt
 } from "@kymo/core"
 import { Effect, Fiber, Stream } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
@@ -119,7 +121,7 @@ const decodeBatch = (
   info: VideoInfo,
   batch: Batch,
   target: Size,
-  timeAt: (index: FrameIndex) => number
+  clock: Rate
 ): Stream.Stream<DecodedFrame, KymoError> =>
   Stream.unwrap(
     Effect.gen(function* () {
@@ -145,7 +147,11 @@ const decodeBatch = (
         toFrames(target.width * target.height * 3),
         Stream.flatMap((bytes) => {
           const { index, repeat } = batch.frames[produced++]!
-          const frame = { index, t: timeAt(index), image: RgbImage.make(target.width, target.height, bytes) }
+          const frame = {
+            index,
+            t: secondsAt(clock, index),
+            image: RgbImage.make(target.width, target.height, bytes)
+          }
           return Stream.fromIterable(Array.from({ length: repeat }, () => frame))
         }),
         Stream.concat(Stream.drain(Stream.fromEffect(finish)))
@@ -160,11 +166,11 @@ export const readVideoFrames =
     bins: Binaries,
     path: string,
     info: VideoInfo,
-    timeAt: (index: FrameIndex) => number
+    clock: Rate
   ) =>
   (indices: ReadonlyArray<FrameIndex>, target: Size): Stream.Stream<DecodedFrame, KymoError> => {
     const fps = info.rate.num / info.rate.den
     return Stream.fromIterable(plan(indices, Math.max(30, Math.round(fps * 2)))).pipe(
-      Stream.flatMap((batch) => decodeBatch(spawner, bins, path, info, batch, target, timeAt))
+      Stream.flatMap((batch) => decodeBatch(spawner, bins, path, info, batch, target, clock))
     )
   }
