@@ -77,3 +77,7 @@ export const resolveContext = (timeline: Timeline): ResolveContext => ({
   live: timeline.live,
   markers: timeline.markers
 })
+
+/** The `view` input of `kymo frames` / `kymo_frames`. Defined once here so findings can only suggest real views. */
+export const FramesView = Schema.Literals(["sheet", "onion", "diff", "follow", "grid"])
+export type FramesView = typeof FramesView.Type

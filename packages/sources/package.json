@@ -1,0 +1,15 @@
+{
+  "name": "@kymo/sources",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@effect/platform-node": "4.0.7",
+    "@kymo/core": "*",
+    "effect": "4.0.7",
+    "sharp": "^0.35.5"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "@kymo/analysis",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@kymo/core": "*",
+    "effect": "4.0.7"
+  }
+}
