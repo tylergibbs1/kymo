@@ -97,17 +97,6 @@ Add the server to Claude Code, Claude Desktop or any MCP client, using the path 
 
 It exposes seven tools: `kymo_probe`, `kymo_scan`, `kymo_frames`, `kymo_compare`, `kymo_track`, `kymo_check` and `kymo_record`. Use `kymo mcp --http :3917` for Streamable HTTP. Give your agent [the skill](skills/kymo/SKILL.md) so it knows the workflow.
 
-### Use it as a library
-
-```ts
-import { Effect } from "effect"
-import { KymoLive, execute, scan } from "kymo"
-
-const overview = await Effect.runPromise(
-  execute(scan, { source: "clip.mp4", budget: 8 }).pipe(Effect.provide(KymoLive))
-)
-```
-
 ## Status
 
 kymo is at v0. Video, image sequences and synthetic scenes work today. Web/UI animation (Playwright), telemetry, live camera and screen buffers, Remotion and Lottie are next; `kymo_record` returns a clear "not available yet" error until live sources land.

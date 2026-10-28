@@ -1,5 +1,6 @@
 {
   "name": "kymo",
+  "private": true,
   "version": "0.0.0",
   "description": "See and measure motion: one Timeline and one frame address for video, synthetic and (soon) web and live sources.",
   "type": "module",
