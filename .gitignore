@@ -3,3 +3,4 @@ node_modules
 *.tsbuildinfo
 eval/reports/runs
 eval/.cache
+eval/reports/external

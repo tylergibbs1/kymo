@@ -4,6 +4,9 @@
  *   npx tsx eval/src/main.ts run --model oracle --split dev --experiment target --limit 10
  *   npx tsx eval/src/main.ts tasks          regenerate eval/tasks/synthetic.json from ground truth
  *   npx tsx eval/src/main.ts experiments    list experiments and their variants
+ *   npx tsx eval/src/main.ts export --out DIR --key DIR [--split dev|heldout|all]
+ *                                           questions for an outside agent; the key goes elsewhere
+ *   npx tsx eval/src/main.ts score --key DIR/key.json --answers answers.json
  *
  * Reports go to eval/reports/runs/<timestamp>/; progress goes to stderr.
  */
@@ -15,6 +18,7 @@ import { Sources } from "@kymo/sources"
 import { Effect, Schema } from "effect"
 import { toEnv } from "kymo"
 import { EXPERIMENTS, experimentNamed } from "./Experiments.ts"
+import { Answers, exportQuestions, scoreAnswers, summarize } from "./External.ts"
 import { modelFor } from "./Models.ts"
 import { systemPrompt } from "./Prompts.ts"
 import { runExperiment } from "./Runner.ts"
@@ -64,7 +68,9 @@ const USAGE = `Usage:
               [--concurrency N] [--server "${DEFAULT_SERVER}"] [--server-log] [--clips]
               [--effort low|medium|high|xhigh|max] [--max-tokens N]
   main.ts tasks
-  main.ts experiments`
+  main.ts experiments
+  main.ts export --out DIR --key DIR [--split dev|heldout|all]
+  main.ts score --key KEY.json --answers ANSWERS.json [--title TEXT]`
 
 /** Filter, then cap: --family, --per-family and --limit compose in that order. */
 const select = (tasks: ReadonlyArray<Task>, args: typeof RunArgs.Type): ReadonlyArray<Task> => {
@@ -161,6 +167,45 @@ const experiments = Effect.sync(() => {
   for (const e of EXPERIMENTS) err(`${e.name}: ${e.question}\n  ${e.variants.map((v) => v.name).join(", ")}`)
 })
 
+const exportCommand = (argv: ReadonlyArray<string>) =>
+  Effect.gen(function* () {
+    const { values } = parseArgs({
+      args: [...argv],
+      options: { out: { type: "string" }, key: { type: "string" }, split: { type: "string", default: "all" } }
+    })
+    if (values.out === undefined || values.key === undefined) return yield* Effect.fail(new Error(USAGE))
+    const split = values.split
+    const tasks = (yield* loadTaskFile(PATHS.synthetic)).filter((t) => split === "all" || t.split === split)
+    const n = yield* exportQuestions({
+      tasks,
+      cacheDir: PATHS.cache,
+      questionsDir: resolve(values.out),
+      keyDir: resolve(values.key)
+    })
+    err(
+      `Wrote ${n} questions to ${resolve(values.out)}/questions.json; key in ${resolve(values.key)}/key.json`
+    )
+  })
+
+const scoreCommand = (argv: ReadonlyArray<string>) =>
+  Effect.gen(function* () {
+    const { values } = parseArgs({
+      args: [...argv],
+      options: {
+        key: { type: "string" },
+        answers: { type: "string" },
+        title: { type: "string", default: "External agent" }
+      }
+    })
+    if (values.key === undefined || values.answers === undefined) return yield* Effect.fail(new Error(USAGE))
+    const answers = yield* Schema.decodeUnknownEffect(Answers)(
+      JSON.parse(readFileSync(values.answers, "utf8"))
+    )
+    const tasks = yield* loadTaskFile(PATHS.synthetic)
+    const results = yield* scoreAnswers({ tasks, keyPath: values.key, answers })
+    process.stdout.write(summarize(results, values.title))
+  })
+
 const [command, ...rest] = process.argv.slice(2)
 const program =
   command === "run"
@@ -169,7 +214,11 @@ const program =
       ? tasks
       : command === "experiments"
         ? experiments
-        : Effect.fail(new Error(USAGE))
+        : command === "export"
+          ? exportCommand(rest)
+          : command === "score"
+            ? scoreCommand(rest)
+            : Effect.fail(new Error(USAGE))
 
 Effect.runPromise(program).catch((e: unknown) => {
   err(e instanceof Error ? e.message : String(e))
