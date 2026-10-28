@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -37,9 +37,51 @@ export interface ClipSpec {
 const ffmpeg = (...args: ReadonlyArray<string>) =>
   execFileSync("ffmpeg", ["-nostdin", "-v", "error", "-y", ...args])
 
-/** A detailed, non-repeating texture (Perlin noise at high contrast), so differences saturate as on film. */
-const texture = (seed: number, width: number, fps: number) =>
-  `perlin=size=${width}x270:rate=${fps}:octaves=6:persistence=0.8:xscale=6:yscale=6:tscale=0:random_mode=seed:random_seed=${seed},eq=contrast=2.5`
+const HEIGHT = 270
+
+/** A seeded PRNG (mulberry32), so every run draws the same texture. */
+const random = (seed: number) => () => {
+  seed = (seed + 0x6d2b79f5) | 0
+  let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+}
+
+/**
+ * A detailed, non-repeating texture (six octaves of value noise at high contrast), so differences
+ * saturate as on film. Drawn here rather than by an ffmpeg filter, so the fixtures work with any
+ * ffmpeg build. Written as a PGM, which every ffmpeg reads.
+ */
+const texture = (path: string, seed: number, width: number): string => {
+  const next = random(seed)
+  const sum = new Float64Array(width * HEIGHT)
+  let weight = 0
+  for (let octave = 0, cell = 48, amp = 1; octave < 6; octave++, cell /= 2, amp *= 0.8) {
+    const gw = Math.ceil(width / cell) + 2
+    const gh = Math.ceil(HEIGHT / cell) + 2
+    const grid = Float64Array.from({ length: gw * gh }, next)
+    for (let y = 0; y < HEIGHT; y++) {
+      const gy = y / cell
+      const y0 = Math.floor(gy)
+      const fy = gy - y0
+      for (let x = 0; x < width; x++) {
+        const gx = x / cell
+        const x0 = Math.floor(gx)
+        const fx = gx - x0
+        const at = (i: number, j: number) => grid[(y0 + j) * gw + x0 + i]!
+        const top = at(0, 0) + (at(1, 0) - at(0, 0)) * fx
+        const bottom = at(0, 1) + (at(1, 1) - at(0, 1)) * fx
+        sum[y * width + x]! += amp * (top + (bottom - top) * fy)
+      }
+    }
+    weight += amp
+  }
+  const pixels = Uint8Array.from(sum, (v) =>
+    Math.max(0, Math.min(255, Math.round(128 + 2.5 * 255 * (v / weight - 0.5))))
+  )
+  writeFileSync(path, Buffer.concat([Buffer.from(`P5\n${width} ${HEIGHT}\n255\n`), pixels]))
+  return path
+}
 
 export const footage = (): Footage => {
   const dir = mkdtempSync(join(tmpdir(), "kymo-footage-"))
@@ -55,10 +97,12 @@ export const footage = (): Footage => {
         "format=yuv420p"
       ]
       ffmpeg(
-        "-f",
-        "lavfi",
+        "-loop",
+        "1",
+        "-framerate",
+        String(spec.fps),
         "-i",
-        texture(spec.seed ?? 1, width, spec.fps),
+        texture(join(dir, `${name}.pgm`), spec.seed ?? 1, width),
         "-vf",
         filters.join(","),
         "-frames:v",
