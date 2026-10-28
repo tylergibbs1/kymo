@@ -1,0 +1,6 @@
+flowchart LR
+  S["Source<br>video · image sequence<br>synthetic"] --> T["Timeline<br>frames + tracks + markers"]
+  T --> V["Views<br>sheet · onion · diff · follow"]
+  T --> A["Analysis<br>motion · cuts · tracking<br>easing · lint"]
+  V --> O["Labelled PNGs<br>sized for the model"]
+  A --> N["Numbers and findings<br>with addresses"]

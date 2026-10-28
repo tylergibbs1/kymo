@@ -28,14 +28,10 @@
 
 A still frame hides motion: you can't see the timing, spacing or easing between frames. kymo turns every source into a **Timeline**, frames and numeric tracks on one clock, and gives every frame one address. That address is the same in the image label, the JSON and the file name, so an agent can quote back exactly what it saw.
 
-```mermaid
-flowchart LR
-  S["Source<br>video · image sequence · synthetic"] --> T["Timeline<br>frames + tracks + markers"]
-  T --> V["Views<br>sheet · onion · diff · follow"]
-  T --> A["Analysis<br>motion · cuts · tracking · easing · lint"]
-  V --> O["Labelled PNGs sized for the model"]
-  A --> N["Numbers and findings with addresses"]
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/how-it-works-dark.svg">
+  <img src="docs/images/how-it-works-light.svg" alt="A source becomes a Timeline of frames, tracks and markers. Views turn it into labelled PNGs sized for the model; analysis turns it into numbers and findings with addresses.">
+</picture>
 
 An agent follows four steps, and each step is one call:
 

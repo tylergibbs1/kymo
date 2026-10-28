@@ -20,6 +20,7 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run format:check
+      - run: npm run docs:check
       - run: npm test
       - name: Eval smoke run (scripted baseline)
         run: npm run eval:smoke

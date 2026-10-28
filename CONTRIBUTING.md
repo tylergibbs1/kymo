@@ -24,6 +24,7 @@ npm run eval:smoke      # scripted agent answers every task type through the MCP
 | `packages/kymo`                     | The operations. Each has one input and one output Schema.                               |
 | `apps/cli`, `apps/mcp`              | The `kymo` binary and the MCP server, generated from those Schemas.                     |
 | `eval`                              | Tasks with ground truth, the agent loop, experiments and reports.                       |
+| `docs/diagrams`                     | Mermaid sources for the README diagrams, rendered to SVG with Pele.                     |
 
 ## How we work
 
@@ -31,6 +32,7 @@ npm run eval:smoke      # scripted agent answers every task type through the MCP
 - **Test at module boundaries**: through `Source.readFrames`, an op, the CLI binary or a real MCP client. Avoid testing internals.
 - **Design questions go to the eval.** If you think 9 cells beat 12, add or run an experiment in `eval/src/Experiments.ts` and post the report.
 - **The CLI and tool contract only grows.** Flags, fields and env vars are added, never renamed or repurposed.
+- **Diagrams are Mermaid files** in `docs/diagrams`. Edit the `.mmd`, then run `npm run docs:diagrams` to render the light and dark SVGs; CI fails if they are stale.
 - Run `npm run typecheck`, `npm run lint`, `npm run format` and `npm test` before opening a pull request. CI runs the same, plus the eval smoke run.
 
 ## Good first issues
