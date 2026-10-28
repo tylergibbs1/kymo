@@ -1,50 +1,103 @@
-# kymo
+<p align="center">
+  <img src="docs/images/logo.svg" alt="kymo" width="320">
+</p>
 
-kymo lets an AI agent see and measure motion. It turns a video, an image sequence or a synthetic scene into a Timeline (frames and numeric tracks on one clock) and answers questions about it with labelled contact sheets and numbers: what happens and when, where things cut, flicker or drop frames, how an animation is eased, and whether a change fixed it.
+<p align="center">
+  <strong>Motion perception for AI agents.</strong><br>
+  kymo lets an agent see and measure anything that moves (video, animation, synthetic scenes) as labelled frames and real numbers.<br>
+  It's for people building agents that review animations, debug video, or prove a motion change worked.
+</p>
 
-Every frame has one address (`08s10f`, `#250`, `-1f`, `@impact1+5f`, `2s..4s:2f`). The same address appears in image labels, JSON and file names, so an agent can pass back exactly what it saw.
+<p align="center">
+  <a href="https://github.com/tylergibbs1/kymo/actions/workflows/ci.yml"><img src="https://github.com/tylergibbs1/kymo/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT license"></a>
+  <img src="https://img.shields.io/badge/node-24-339933.svg" alt="Node 24">
+  <img src="https://img.shields.io/badge/MCP-2025--11--25%20%7C%202026--07--28-6f42c1.svg" alt="MCP 2025-11-25 and 2026-07-28">
+  <a href="https://github.com/tylergibbs1/kymo/commits/main"><img src="https://img.shields.io/github/last-commit/tylergibbs1/kymo.svg" alt="Last commit"></a>
+</p>
 
-## Install
+<p align="center">
+  <a href="#quick-start"><strong>Quick start</strong></a> ·
+  <a href="#use-it-from-an-agent-mcp"><strong>Add to Claude</strong></a> ·
+  <a href="skills/kymo/SKILL.md"><strong>Agent skill</strong></a> ·
+  <a href="eval/README.md"><strong>Eval results</strong></a> ·
+  <a href="CONTRIBUTING.md"><strong>Contribute</strong></a>
+</p>
 
-kymo needs Node 24 and, for video, `ffmpeg` and `ffprobe` on `PATH` (or `KYMO_FFMPEG` and `KYMO_FFPROBE`).
+## How it works
+
+A still frame hides motion: you can't see the timing, spacing or easing between frames. kymo turns every source into a **Timeline**, frames and numeric tracks on one clock, and gives every frame one address. That address is the same in the image label, the JSON and the file name, so an agent can quote back exactly what it saw.
+
+```mermaid
+flowchart LR
+  S["Source<br>video · image sequence · synthetic"] --> T["Timeline<br>frames + tracks + markers"]
+  T --> V["Views<br>sheet · onion · diff · follow"]
+  T --> A["Analysis<br>motion · cuts · tracking · easing · lint"]
+  V --> O["Labelled PNGs sized for the model"]
+  A --> N["Numbers and findings with addresses"]
+```
+
+An agent follows four steps, and each step is one call:
+
+| 1. The clip                                                                     | 2. `scan`: where does it change?                                                                                                 | 3. `frames --view onion`: what path?                                                                            | 4. `frames --view diff`: what moved?                                                       |
+| ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| <img src="docs/images/bounce.gif" width="220" alt="A ball bouncing off a wall"> | <img src="docs/images/scan-sheet.png" width="220" alt="Contact sheet of 8 frames, motion-sampled, labelled 0f #0 to 02s29f #89"> | <img src="docs/images/onion.png" width="220" alt="Onion skin showing the ball's spacing widen as it speeds up"> | <img src="docs/images/diff.png" width="220" alt="Difference heatmaps at 18f, 20f and 22f"> |
+
+Then `track` measures it: the ball first touches the wall at `20f #20`, and `check` can assert that, e.g. `@impact1 within #18..#22`. See the [skill](skills/kymo/SKILL.md) for the full loop.
+
+### Frame addresses
+
+| Write            | Means                                |
+| ---------------- | ------------------------------------ |
+| `08s10f`         | 8 seconds and 10 frames (canonical)  |
+| `#250`           | frame index 250                      |
+| `8.33s`, `500ms` | a time, rounded to the nearest frame |
+| `-1f`            | the last frame                       |
+| `@impact1+5f`    | five frames after a marker           |
+| `2s..4s:2f`      | a range, every second frame          |
+| `clip1@08s10f`   | an address on a named source         |
+
+## Features
+
+- 🎞️ **Contact sheets sized for the model.** Up to 12 labelled frames per image, sized to `high-res` (≤2576 px, ≤4784 visual tokens) or `standard` (≤1568 px, ≤1568 tokens), so cost is known before rendering. Frames are never upscaled, labels sit under the frame and are at least 28 px tall.
+- 🧅 **Views that show motion between frames.** `onion` blends frames into one cell to show path and spacing, `diff` heatmaps what changed, `follow` crops a region over time, `compare` puts two sources side by side at the same addresses, `plot` charts numeric tracks.
+- 📈 **Numbers, not guesses.** `track` follows a box and returns `x`, `y`, `w`, `h` per frame, then fits the easing (`linear`, CSS presets, `cubic-bezier(...)`, or a spring with stiffness and damping). Synthetic sources return exact ground-truth tracks.
+- ✂️ **Finds what changes.** `scan` measures motion energy, finds hard cuts and fades, and spends its frame budget where things move. Cuts and peaks become markers you can address, like `@cut1`.
+- 🔍 **Lint rules and assertions.** `check` finds duplicated, dropped and black frames, flicker, things leaving the safe area, and curves that reverse. Assertions read like the question:
+  ```sh
+  kymo check clip1 --assert "box.x <= 600 at 1s" --assert "@impact1 within #18..#22"
+  ```
+- 🤝 **Agent-friendly contract.** stdout carries only JSON. Errors are typed with a hint that says how to fix them (`"8s10" is not an address. Use 08s10f, #250, 8.33s…`). Flags are only ever added, and `kymo schema` prints every input and output JSON Schema.
+- 🧪 **An eval decides the design.** 42 tasks with ground truth, an agent loop for Claude, and A/B experiments for sheet size, cells per sheet, label style, sampling, tool examples and text format. [Read more](eval/README.md).
+
+## Quick start
+
+You need Node 24 and ffmpeg.
 
 ```sh
-brew install ffmpeg        # or: apt install ffmpeg
+brew install ffmpeg            # or: sudo apt install ffmpeg
+git clone https://github.com/tylergibbs1/kymo && cd kymo
 npm install
+npm run --silent kymo -- scan "synthetic:bounce?impact=20" --budget 8
 ```
 
-Inside this repo, run the CLI with `npx kymo …` or `npm run --silent kymo -- …`.
+Point it at your own video the same way: `npm run --silent kymo -- probe clip.mp4`. More commands are in the [video reference](skills/kymo/references/video.md).
 
-## CLI
+### Use it from an agent (MCP)
 
-```sh
-kymo probe clip.mp4                                   # handle, fps, duration, size, tracks, markers
-kymo scan clip1 --budget 8                             # overview sheet, motion summary, cuts, next ranges
-kymo frames clip1 --at 0f 08s10f -1f                   # frames you already know
-kymo frames clip1 --range 2s..4s:2f --view onion       # path and spacing of a move
-kymo track "synthetic:ease?easing=ease-out" --fit-easing
-kymo check clip1 --rules flicker black-frames --assert "@impact1 within #15..#25"
-kymo compare before.mp4 after.mp4 --at 0f 1s -1f --view diff
-kymo schema frames                                     # input and output JSON Schemas
-```
-
-stdout carries one JSON value; `frames`, `compare` and `check` print JSON Lines (one per sheet or finding, then the summary). Images are written to a fresh `kymo-*` temp directory, or `--out dir`. Every command also takes its whole input as `--json '{…}'`.
-
-Errors go to stderr as `{"tag", "message", "hint"}`, and the exit code says what kind: 2 for bad input, 3 for a missing source, 4 for an unavailable capability (such as no ffmpeg), 5 for a timeout, 6 for a backend failure.
-
-## MCP
+Add the server to Claude Code, Claude Desktop or any MCP client, using the path to your clone:
 
 ```json
 {
   "mcpServers": {
-    "kymo": { "command": "npx", "args": ["kymo", "mcp"] }
+    "kymo": { "command": "node", "args": ["/path/to/kymo/apps/cli/bin/kymo.js", "mcp"] }
   }
 }
 ```
 
-The server offers `kymo_probe`, `kymo_scan`, `kymo_frames`, `kymo_compare`, `kymo_track`, `kymo_check` and `kymo_record`. Each result puts a sheet's label right before its image, followed by a `kymo://` resource link. `kymo mcp --http :3917` serves Streamable HTTP on `/mcp` instead of stdio. Three environment variables switch server behaviour, all defined in `packages/kymo/src/ServerConfig.ts`: `KYMO_TOOL_EXAMPLES=on|off` (examples in tool descriptions), `KYMO_LABEL_STYLE=both|timecode|index` (frame labels on images and before them: `08s10f #250`, `08s10f` or `#250`; JSON addresses never change) and `KYMO_TEXT_FORMAT=json|markdown` (the text block next to `structuredContent`). Defaults are `on`, `both`, `json`; any other value stops the server at startup.
+It exposes seven tools: `kymo_probe`, `kymo_scan`, `kymo_frames`, `kymo_compare`, `kymo_track`, `kymo_check` and `kymo_record`. Use `kymo mcp --http :3917` for Streamable HTTP. Give your agent [the skill](skills/kymo/SKILL.md) so it knows the workflow.
 
-## Library
+### Use it as a library
 
 ```ts
 import { Effect } from "effect"
@@ -55,8 +108,19 @@ const overview = await Effect.runPromise(
 )
 ```
 
-Each operation (`probe`, `scan`, `frames`, `compare`, `track`, `check`, `record`, `open`) carries its input and output Schemas. `execute` decodes the input, runs the operation and encodes the output as JSON; `op.run` takes and returns the decoded types. `kymoLayer({ out, root })` picks the image directory and the directory that holds `.kymo/handles.json`.
+## Status
 
-## Agent skill
+kymo is at v0. Video, image sequences and synthetic scenes work today. Web/UI animation (Playwright), telemetry, live camera and screen buffers, Remotion and Lottie are next; `kymo_record` returns a clear "not available yet" error until live sources land.
 
-[skills/kymo/SKILL.md](skills/kymo/SKILL.md) teaches an agent the loop: probe, scan, frames, track or check, change, compare.
+## Contributing
+
+Contributions are welcome, from bug reports to new source adapters.
+
+- Read the [contributing guide](CONTRIBUTING.md) to set up and run the tests and eval.
+- Pick up a [good first issue](https://github.com/tylergibbs1/kymo/labels/good%20first%20issue) to start small.
+- Everyone involved follows the [Code of Conduct](CODE_OF_CONDUCT.md): be kind, assume good intent, critique the work and not the person.
+- Settle design arguments with an experiment in the [eval](eval/README.md), not a long thread.
+
+## License
+
+[MIT](LICENSE)

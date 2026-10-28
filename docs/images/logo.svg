@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="96" viewBox="0 0 320 96" role="img" aria-label="kymo">
+  <circle cx="22" cy="48" r="14" fill="#3b9cff" opacity="0.18"/>
+  <circle cx="44" cy="48" r="14" fill="#3b9cff" opacity="0.32"/>
+  <circle cx="70" cy="48" r="14" fill="#3b9cff" opacity="0.55"/>
+  <circle cx="100" cy="48" r="14" fill="#3b9cff"/>
+  <text x="132" y="64" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="48" font-weight="600" fill="#3b9cff">kymo</text>
+</svg>
