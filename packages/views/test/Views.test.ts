@@ -252,14 +252,15 @@ describe("compare", () => {
       const a = fakeSource()
       const b = fakeSource({ handle: "clip2" })
       const frames = indices(0, 50, 250)
-      const side = yield* compare({ a, b, frames, outDir: dir, labelStyle: "both", target: standard })
+      const pairs = frames.map((i) => ({ a: i, b: i }))
+      const side = yield* compare({ a, b, pairs, outDir: dir, labelStyle: "both", target: standard })
       expect(basename(side.images[0]!.path)).toBe("0f-08s10f.compare.clip1.clip2.png")
       const sideImg = yield* pixels(side.images[0]!.path)
       expect(sideImg.width).toBeGreaterThanOrEqual(2 * 320)
       const d = yield* compare({
         a,
         b,
-        frames,
+        pairs,
         outDir: dir,
         labelStyle: "both",
         target: standard,

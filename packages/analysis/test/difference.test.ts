@@ -13,10 +13,10 @@ describe("frameDifferences", () => {
         scene: (i) => ({ background: i < 5 ? [100, 100, 100] : [200, 200, 200] })
       })
       const diffs = yield* frameDifferences(a, b, [
-        frameIndex(0),
-        frameIndex(4),
-        frameIndex(5),
-        frameIndex(9)
+        { a: frameIndex(0), b: frameIndex(0) },
+        { a: frameIndex(4), b: frameIndex(4) },
+        { a: frameIndex(5), b: frameIndex(5) },
+        { a: frameIndex(9), b: frameIndex(9) }
       ])
       expect(diffs.map((d) => d.address)).toEqual(["0f", "4f", "5f", "9f"])
       expect(diffs.map((d) => d.meanDiff)).toEqual([0, 0, 0.392157, 0.392157])
@@ -33,7 +33,7 @@ describe("frameDifferences", () => {
             Stream.map((index) => ({ index, t: 0, image: RgbImage.blank(32, 24, [50, 50, 50]) }))
           )
       }
-      const [d] = yield* frameDifferences(a, small, [frameIndex(1)])
+      const [d] = yield* frameDifferences(a, small, [{ a: frameIndex(1), b: frameIndex(1) }])
       expect(d).toMatchObject({ address: "1f", index: 1, meanDiff: 0 })
     })
   )
