@@ -25,6 +25,8 @@ export interface Scene {
   readonly texture?: number
   /** Drawn in order; `alpha` (default 1) blends a rectangle over what is under it, as a fade does. */
   readonly rects?: ReadonlyArray<{ x: number; y: number; w: number; h: number; rgb: Rgb; alpha?: number }>
+  /** Another scene composited over this one as a whole at `alpha`, as a page cross-fades over another. */
+  readonly over?: { readonly scene: Scene; readonly alpha: number }
 }
 
 const hash = (x: number, y: number) => {
@@ -60,6 +62,11 @@ export const draw = (scene: Scene, width = W, height = H): RgbImage => {
         for (let c = 0; c < 3; c++) d[p + c] = Math.round(k * r.rgb[c]! + (1 - k) * d[p + c]!)
       }
     }
+  }
+  if (scene.over !== undefined) {
+    const top = draw(scene.over.scene, width, height).data
+    const a = scene.over.alpha
+    for (let p = 0; p < d.length; p++) d[p] = Math.round(a * top[p]! + (1 - a) * d[p]!)
   }
   return img
 }

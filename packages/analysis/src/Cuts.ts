@@ -1,5 +1,6 @@
 import { FrameRef, Marker, fpsOf } from "@kymo/core"
 import { Schema } from "effect"
+import { isOverlay } from "./Overlay.ts"
 import { type Gray, histogramDistance, meanAbsDiff } from "./Pixels.ts"
 import type { Scan } from "./Scan.ts"
 import { signals } from "./Signals.ts"
@@ -60,6 +61,14 @@ const MIX_END = 0.05
  */
 const TONE_MARGIN = 4
 const TONE_MIN = 0.1
+/**
+ * A fade starts on the first frame measurably mixed towards the incoming picture: mixed by at least
+ * this share, and further than the frame before by this multiple of the outgoing shot's own drift.
+ */
+const MIX_VISIBLE = 0.01
+const MIX_DRIFT_MARGIN = 3
+/** A flash is one frame that differs from both its neighbours by this multiple of how much they differ. */
+const FLASH_RETURN = 2
 
 interface Found {
   readonly kind: Cut["kind"]
@@ -80,6 +89,29 @@ const coarseFloor = (scan: Scan, coarse: ReadonlyArray<number>): number => {
   return COARSE_MARGIN * (changes[Math.floor(COARSE_QUANTILE * (changes.length - 1))] ?? 0)
 }
 
+/**
+ * One-frame flashes (a white frame, a glitch) belong to neither shot: the picture returns on the next
+ * frame. Transitions are read with each flash replaced by the frame before it, so no detector can take
+ * a flash for a cut, for the end of a fade or for a step of its mix.
+ */
+const withoutFlashes = (scan: Scan): Scan => {
+  const f = scan.frames
+  const out = [...f]
+  for (let k = 1; k + 1 < f.length; k++) {
+    const before = out[k - 1]!
+    const [here, after] = [f[k]!, f[k + 1]!]
+    const away = Math.min(meanAbsDiff(before.thumb, here.thumb), meanAbsDiff(here.thumb, after.thumb))
+    if (away <= 0 || FLASH_RETURN * meanAbsDiff(before.thumb, after.thumb) >= away) continue
+    out[k] = { ...here, thumb: before.thumb, histogram: before.histogram, histDiff: 0, thumbDiff: 0 }
+    out[k + 1] = {
+      ...after,
+      histDiff: histogramDistance(before.histogram, after.histogram),
+      thumbDiff: meanAbsDiff(before.thumb, after.thumb)
+    }
+  }
+  return { ...scan, frames: out }
+}
+
 const hardCuts = (scan: Scan, coarse: ReadonlyArray<number>, floor: number): Array<Found> => {
   const f = scan.frames
   const diffs = f.map((s) => s.histDiff ?? 0)
@@ -91,13 +123,6 @@ const hardCuts = (scan: Scan, coarse: ReadonlyArray<number>, floor: number): Arr
     const threshold = Math.max(HARD_FLOOR, median(around) + SIGMAS * robustSigma(around), 3 * median(around))
     if (s.histDiff < threshold || coarse[k]! <= 0 || coarse[k]! < floor) continue
     if (neighbours(diffs, k, 2).some((d) => d > s.histDiff!)) continue
-    // A cut persists; a one-frame flash returns. Compare the frame before with the frame after.
-    const after = f[k + 1]
-    const before = f[k - 1]
-    if (after && before && histogramDistance(before.histogram, after.histogram) < s.histDiff / 2) continue
-    // ...and the frame after a flash looks like the one before it.
-    const twoBack = f[k - 2]
-    if (twoBack && histogramDistance(twoBack.histogram, s.histogram) < s.histDiff / 2) continue
     out.push({ kind: "hard", at: s.index, from: s.index - 1, to: s.index, score: s.histDiff })
   }
   return out
@@ -148,6 +173,16 @@ const fadeAcross = (
   if (to - from < FADE_MIN_FRAMES) return undefined
   const maxStep = Math.min(MIX_MAX_STEP, MIX_SPREAD / (to - from))
   for (let j = from + 1; j <= to; j++) if (alphas[j]! - alphas[j - 1]! > maxStep) return undefined
+  // The incoming picture shows from the first frame measurably mixed, which an easing can put well
+  // before the mix reaches MIX_END. Motion inside the outgoing shot drifts the mix a little every frame,
+  // so a mixed frame must also step further than the outgoing frames typically do.
+  const drift = median(alphas.slice(1, from + 1).map((x, j) => Math.abs(x - alphas[j]!)))
+  while (
+    from > 0 &&
+    alphas[from]! > MIX_VISIBLE &&
+    alphas[from]! - alphas[from - 1]! > MIX_DRIFT_MARGIN * drift
+  )
+    from--
   return { from: a + from, to: a + to }
 }
 
@@ -203,15 +238,23 @@ const fades = (scan: Scan, floor: number): Array<Found> => {
 }
 
 /**
- * Hard cuts (an adaptive histogram threshold plus a coarse-picture change relative to the clip's own,
- * ignoring one-frame flashes) and fades or dissolves (every frame between two pictures is a steady mix of
- * them). Markers are `cut1..` in time order.
+ * Hard cuts (an adaptive histogram threshold plus a coarse-picture change relative to the clip's own)
+ * and fades or dissolves (every frame between two pictures is a steady mix of them). Every transition
+ * is read without one-frame flashes and must end on a new picture, not the old one with something drawn
+ * over it. Markers are `cut1..` in time order.
  */
-export const detectCuts = (scan: Scan): Cuts => {
+export const detectCuts = (recorded: Scan): Cuts => {
+  const scan = withoutFlashes(recorded)
   const coarse = coarseChange(scan)
   const floor = coarseFloor(scan, coarse)
-  const found = fades(scan, floor)
-  for (const h of hardCuts(scan, coarse, floor)) {
+  // A cut on a range's first frame comes from a frame before the range, whose picture was not kept.
+  const thumb = (index: number) => scan.frames[index - scan.range.first]?.thumb
+  const newPicture = (x: Found) => {
+    const [a, b] = [thumb(x.from), thumb(x.to)]
+    return a === undefined || b === undefined || !isOverlay(a, b)
+  }
+  const found = fades(scan, floor).filter(newPicture)
+  for (const h of hardCuts(scan, coarse, floor).filter(newPicture)) {
     if (!found.some((x) => h.at > x.from && h.at <= x.to)) found.push(h)
   }
   found.sort((a, b) => a.at - b.at)

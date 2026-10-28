@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect } from "effect"
 import { FrameRange, detectCuts, scan } from "@kymo/analysis"
-import { type Scene, fakeSource } from "./fake.ts"
+import { type Rgb, type Scene, fakeSource } from "./fake.ts"
 
 /** A dark chat page: a faint line of text streams in every five frames. */
 const chat = (i: number): Scene => ({
@@ -41,6 +41,125 @@ describe("cuts in a screen recording", () => {
       const range = yield* FrameRange.whole(source.timeline)
       const s = yield* scan(source, range)
       expect(detectCuts(s).cuts.map((c) => c.marker.index)).toEqual([10, 20, 30, 40, 50])
+    })
+  )
+})
+
+/** A light dashboard: a dark header and a few lines of text. */
+const lightPage: Scene = {
+  background: [238, 241, 245],
+  rects: [
+    { x: 0, y: 0, w: 64, h: 4, rgb: [20, 30, 50] },
+    { x: 3, y: 8, w: 25, h: 1, rgb: [190, 196, 208] },
+    { x: 3, y: 11, w: 18, h: 1, rgb: [190, 196, 208] },
+    { x: 35, y: 8, w: 26, h: 1, rgb: [190, 196, 208] },
+    { x: 3, y: 40, w: 58, h: 1, rgb: [190, 196, 208] },
+    { x: 3, y: 43, w: 44, h: 1, rgb: [190, 196, 208] }
+  ]
+}
+/** The page navigated to: a header and four cards, on a dark or a light theme. */
+const settings = (dark: boolean): Scene => {
+  const card: Rgb = dark ? [44, 52, 70] : [227, 217, 196]
+  return {
+    background: dark ? [27, 31, 42] : [247, 243, 234],
+    rects: [
+      { x: 0, y: 0, w: 64, h: 4, rgb: dark ? [13, 18, 32] : [107, 79, 42] },
+      { x: 2, y: 6, w: 19, h: 11, rgb: card },
+      { x: 23, y: 6, w: 19, h: 11, rgb: card },
+      { x: 44, y: 6, w: 18, h: 11, rgb: card },
+      { x: 2, y: 19, w: 60, h: 27, rgb: card }
+    ]
+  }
+}
+const white: Scene = { background: [255, 255, 255] }
+const black: Scene = { background: [0, 0, 0] }
+/** `to` cross-fading over `from` at opacity `alpha`. */
+const mixed = (from: Scene, to: Scene, alpha: number): Scene =>
+  alpha <= 0 ? from : { ...from, over: { scene: to, alpha: Math.min(1, alpha) } }
+/** 0 up to frame `a`, 1 from frame `b`, linear between. */
+const ramp = (i: number, a: number, b: number) => Math.max(0, Math.min(1, (i - a) / (b - a)))
+/** The light page with more layers drawn over it. */
+const withLayers = (layers: NonNullable<Scene["rects"]>): Scene => ({
+  ...lightPage,
+  rects: [...lightPage.rects!, ...layers]
+})
+
+const cutsIn = (scene: (i: number) => Scene, frames = 120) =>
+  Effect.gen(function* () {
+    const source = fakeSource({ frames, fps: 60, scene })
+    const range = yield* FrameRange.whole(source.timeline)
+    return detectCuts(yield* scan(source, range)).cuts
+  })
+
+describe("page transitions in a UI recording", () => {
+  it.effect("a one-frame white flash before a dissolve is neither a cut nor part of the fade", () =>
+    Effect.gen(function* () {
+      // The dissolve starts at frame 72 and is 1/9 mixed at 73; the page flashes white at frame 60.
+      const cuts = yield* cutsIn((i) =>
+        i === 60 ? white : mixed(lightPage, settings(true), ramp(i, 72, 81))
+      )
+      expect(cuts.map((c) => [c.kind, c.from.index, c.incoming.index])).toEqual([["fade", 72, 73]])
+    })
+  )
+
+  it.effect("a dissolve's incoming frame is the first one measurably mixed, though it eases in", () =>
+    Effect.gen(function* () {
+      // Ease-in from frame 48: 0.7% mixed at 50, 1.6% at 51, 4.3% at 53, 6.3% at 54.
+      const cuts = yield* cutsIn((i) => mixed(lightPage, settings(true), ramp(i, 48, 72) ** 2))
+      expect(cuts.map((c) => [c.kind, c.incoming.index])).toEqual([["fade", 51]])
+    })
+  )
+
+  it.effect("a dissolve between two light pages is a fade", () =>
+    Effect.gen(function* () {
+      const cuts = yield* cutsIn((i) => mixed(lightPage, settings(false), ramp(i, 30, 48)))
+      expect(cuts.map((c) => [c.kind, c.incoming.index])).toEqual([["fade", 31]])
+    })
+  )
+
+  it.effect("a backdrop dimming the unchanged page while a dialog fades in is not a cut", () =>
+    Effect.gen(function* () {
+      const cuts = yield* cutsIn(
+        (i) =>
+          withLayers([
+            { x: 0, y: 0, w: 64, h: 48, rgb: [0, 0, 0], alpha: 0.35 * ramp(i, 18, 54) },
+            { x: 20, y: 14, w: 24, h: 18, rgb: [255, 255, 255], alpha: ramp(i, 21, 45) }
+          ]),
+        60
+      )
+      expect(cuts).toEqual([])
+    })
+  )
+
+  it.effect("a backdrop and dialog that appear at once over the unchanged page are not a cut", () =>
+    Effect.gen(function* () {
+      const dimmed = withLayers([
+        { x: 0, y: 0, w: 64, h: 48, rgb: [0, 0, 0], alpha: 0.5 },
+        { x: 20, y: 14, w: 24, h: 18, rgb: [255, 255, 255] }
+      ])
+      expect(yield* cutsIn((i) => (i < 30 ? lightPage : dimmed), 60)).toEqual([])
+    })
+  )
+
+  it.effect("a dialog fading in over the page is not a cut", () =>
+    Effect.gen(function* () {
+      const cuts = yield* cutsIn(
+        (i) => withLayers([{ x: 16, y: 12, w: 32, h: 20, rgb: [44, 52, 70], alpha: ramp(i, 13, 30) }]),
+        60
+      )
+      expect(cuts).toEqual([])
+    })
+  )
+
+  it.effect("a fade to black and back in from black are both fades", () =>
+    Effect.gen(function* () {
+      const cuts = yield* cutsIn((i) =>
+        i < 50 ? mixed(lightPage, black, ramp(i, 30, 48)) : mixed(black, settings(false), ramp(i, 60, 78))
+      )
+      expect(cuts.map((c) => [c.kind, c.incoming.index])).toEqual([
+        ["fade", 31],
+        ["fade", 61]
+      ])
     })
   )
 })
