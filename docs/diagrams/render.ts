@@ -71,6 +71,6 @@ for (const file of readdirSync(sources).filter((f) => f.endsWith(".mmd"))) {
   }
 }
 if (stale.length > 0) {
-  process.stderr.write(`Stale diagrams (run npm run docs:diagrams):\n${stale.join("\n")}\n`)
+  process.stderr.write(`Stale diagrams (run bun run docs:diagrams):\n${stale.join("\n")}\n`)
   process.exit(1)
 }

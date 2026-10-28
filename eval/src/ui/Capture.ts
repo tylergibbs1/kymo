@@ -110,7 +110,7 @@ export const captureAll = (
       catch: (e) =>
         new CaptureFailed({
           key: "-",
-          message: `Could not start Chromium (${e instanceof Error ? e.message : String(e)}). Run \`npx playwright install chromium\`.`
+          message: `Could not start Chromium (${e instanceof Error ? e.message : String(e)}). Run \`bunx playwright install chromium\`.`
         })
     }),
     (browser) =>

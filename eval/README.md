@@ -5,16 +5,16 @@ Every design choice in kymo is an A/B on the same tasks. This package holds the 
 ## Running it
 
 ```sh
-npm run eval:smoke                                   # oracle, one task per question type, all splits
-npm run eval -- run --model oracle --split dev       # oracle baseline on dev
-npm run eval -- run --model claude-opus-5-5 --split dev --experiment target --limit 10
-npm run eval -- experiments                          # list experiments and variants
-npm run eval -- tasks                                # regenerate tasks/synthetic.json and tasks/ui.json
-npm run eval -- ui-capture                           # capture the UI scenes in Chromium (see below)
-npm run eval -- run --model oracle --set ui --split all
+bun run eval:smoke                                   # oracle, one task per question type, all splits
+bun run eval -- run --model oracle --split dev       # oracle baseline on dev
+bun run eval -- run --model claude-opus-5-5 --split dev --experiment target --limit 10
+bun run eval -- experiments                          # list experiments and variants
+bun run eval -- tasks                                # regenerate tasks/synthetic.json and tasks/ui.json
+bun run eval -- ui-capture                           # capture the UI scenes in Chromium (see below)
+bun run eval -- run --model oracle --set ui --split all
 ```
 
-`run` options: `--set synthetic|ui|all` (default `synthetic`), `--model` (`oracle`, any `claude-*` id; `gpt-*` and `gemini-*` fail with a "not configured" error until their adapters exist), `--experiment`, `--split dev|heldout|all`, `--family`, `--per-family N`, `--limit N`, `--max-calls N` (default 20), `--concurrency N`, `--server "<command>"` (default `npx tsx apps/cli/src/bin.ts mcp`), `--server-log`, `--clips`, `--effort` (default `high`), `--max-tokens`.
+`run` options: `--set synthetic|ui|all` (default `synthetic`), `--model` (`oracle`, any `claude-*` id; `gpt-*` and `gemini-*` fail with a "not configured" error until their adapters exist), `--experiment`, `--split dev|heldout|all`, `--family`, `--per-family N`, `--limit N`, `--max-calls N` (default 20), `--concurrency N`, `--server "<command>"` (default `node apps/cli/bin/kymo.js mcp`), `--server-log`, `--clips`, `--effort` (default `high`), `--max-tokens`.
 
 Claude runs need `ANTHROPIC_API_KEY`. Effort is pinned explicitly, because defaults differ between models. Refusal fallbacks are deliberately left off: a run served by a different model would measure the wrong thing, so a refusal is recorded as `stop: refused`.
 
@@ -56,7 +56,7 @@ The synthetic set is saturated: the oracle and Opus both score 42/42, so it no l
 
 ### How a task is made
 
-`eval/ui/scenes/` holds seven pages (`modal`, `spring`, `toast`, `janky`, `transition`, `safearea`, `compare`), each parameterised by its query string, and a small runtime (`scene.js`). `src/ui/Cases.ts` lists 54 captures and the questions asked about each; several questions share a capture. `npm run eval -- ui-capture` drives each page with Playwright at 1280x720: for frame `i` it pauses every Web Animation and seeks it to `i / fps` (or the scene sets styles directly, for the analytic spring and the stepped jank), waits two animation frames, records every tracked element's `getBoundingClientRect` and on-screen opacity, and takes a screenshot. The frames are encoded with x264 to `eval/.cache/ui/<key>/clip.mp4`. The key is a hash of the scene's files, its parameters and the encoder settings. Footage is never committed. It needs Chromium (`npx playwright install chromium`) and ffmpeg, takes about three minutes from a clean cache, and produces the same truth byte for byte each time.
+`eval/ui/scenes/` holds seven pages (`modal`, `spring`, `toast`, `janky`, `transition`, `safearea`, `compare`), each parameterised by its query string, and a small runtime (`scene.js`). `src/ui/Cases.ts` lists 54 captures and the questions asked about each; several questions share a capture. `bun run eval -- ui-capture` drives each page with Playwright at 1280x720: for frame `i` it pauses every Web Animation and seeks it to `i / fps` (or the scene sets styles directly, for the analytic spring and the stepped jank), waits two animation frames, records every tracked element's `getBoundingClientRect` and on-screen opacity, and takes a screenshot. The frames are encoded with x264 to `eval/.cache/ui/<key>/clip.mp4`. The key is a hash of the scene's files, its parameters and the encoder settings. Footage is never committed. It needs Chromium (`bunx playwright install chromium`) and ffmpeg, takes about three minutes from a clean cache, and produces the same truth byte for byte each time.
 
 Answers are measured from the recorded truth (`src/ui/Measure.ts`), never typed in. A change is visible when an edge of the on-screen part of the element moves by 1 px (weighted by opacity), or when its opacity changes by 0.02. Frame tolerances come from the truth too: halve and double that threshold, and the tolerance covers where the answer moves to, so a long spring tail gets a wider window than a hard switch. Generation refuses a case whose answer is too close to call, such as a spring reversal 0.6 to 1.6 px from rest, or two variants that settle within tolerance of each other.
 
@@ -80,7 +80,7 @@ Run them with `--set ui` (or `--set all`); `export` and `score` take `--set` too
 
 ### Why the truth is checked in
 
-CI has no browser, but the task file must not drift from what generation produces. So `ui-capture` also writes `eval/ui/truth.json`: every capture's per-frame boxes and opacities, rounded to a thousandth, with constant tracks folded to one number (about 50 KB). `test/ui.test.ts` regenerates the tasks from that file and fails if `tasks/ui.json` differs, and fails if the truth's capture keys differ from the keys the case list and scene files hash to now. Editing a scene, adding a case or changing capture settings without recapturing fails CI with a hint to run `ui-capture`. Changing only how answers are measured needs `npm run eval -- tasks`, no browser. The same test runs the oracle's tracking strategies against the recorded truth as a perfect tracker, so an oracle miss on footage is the tools', not the strategy's.
+CI has no browser, but the task file must not drift from what generation produces. So `ui-capture` also writes `eval/ui/truth.json`: every capture's per-frame boxes and opacities, rounded to a thousandth, with constant tracks folded to one number (about 50 KB). `test/ui.test.ts` regenerates the tasks from that file and fails if `tasks/ui.json` differs, and fails if the truth's capture keys differ from the keys the case list and scene files hash to now. Editing a scene, adding a case or changing capture settings without recapturing fails CI with a hint to run `ui-capture`. Changing only how answers are measured needs `bun run eval -- tasks`, no browser. The same test runs the oracle's tracking strategies against the recorded truth as a perfect tracker, so an oracle miss on footage is the tools', not the strategy's.
 
 ### Oracle baseline
 

@@ -19,7 +19,7 @@ describe("UI task generation", () => {
     Effect.gen(function* () {
       const onDisk = yield* loadTaskFile(UI_TASKS)
       const generated = yield* generateUi(yield* loadTruth())
-      assert.deepStrictEqual(onDisk, generated, "eval/tasks/ui.json is stale: run `npm run eval -- tasks`")
+      assert.deepStrictEqual(onDisk, generated, "eval/tasks/ui.json is stale: run `bun run eval -- tasks`")
     })
   )
 
@@ -32,7 +32,7 @@ describe("UI task generation", () => {
         assert.deepStrictEqual(
           recorded,
           wanted,
-          "eval/ui/truth.json is stale: run `npm run eval -- ui-capture`"
+          "eval/ui/truth.json is stale: run `bun run eval -- ui-capture`"
         )
       })
   )

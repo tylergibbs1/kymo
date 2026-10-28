@@ -13,14 +13,16 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-          cache: npm
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
       - name: Install ffmpeg and fonts
         run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-dejavu-core
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm run format:check
-      - run: npm run docs:check
-      - run: npm test
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      - run: bun run lint
+      - run: bun run format:check
+      - run: bun run docs:check
+      - run: bun run test
       - name: Eval smoke run (scripted baseline)
-        run: npm run eval:smoke
+        run: bun run eval:smoke

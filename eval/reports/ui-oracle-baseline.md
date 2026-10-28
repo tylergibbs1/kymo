@@ -1,6 +1,6 @@
 # UI set: oracle baseline
 
-The scripted oracle on all 87 UI tasks (`npm run eval -- run --model oracle --set ui --split all`), on kymo before and after the round-2 fixes (tracking and easing rewrite, cut, duplicate and drop rules relative to the clip, cadence detection). The oracle reads only kymo's structured results, so every miss below is a question kymo's tools do not yet answer. A test (`test/ui.test.ts`) runs the same tracking strategies with the recorded browser truth as a perfect tracker, and they pass, so the misses come from the tools and not from the strategies.
+The scripted oracle on all 87 UI tasks (`bun run eval -- run --model oracle --set ui --split all`), on kymo before and after the round-2 fixes (tracking and easing rewrite, cut, duplicate and drop rules relative to the clip, cadence detection). The oracle reads only kymo's structured results, so every miss below is a question kymo's tools do not yet answer. A test (`test/ui.test.ts`) runs the same tracking strategies with the recorded browser truth as a perfect tracker, and they pass, so the misses come from the tools and not from the strategies.
 
 Run on 2026-10-28. The full run directories are under `eval/reports/runs/` and are not committed.
 

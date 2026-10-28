@@ -1,6 +1,6 @@
 /**
  * Loading tasks. Synthetic tasks live in `eval/tasks/synthetic.json`, generated from ground truth
- * (`npm run eval -- tasks`) and checked in so task changes show up in review. Real clips are listed
+ * (`bun run eval -- tasks`) and checked in so task changes show up in review. Real clips are listed
  * in `eval/tasks/clips.json`; their files are fetched separately and are never committed.
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs"

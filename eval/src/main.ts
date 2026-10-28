@@ -1,14 +1,14 @@
 /**
  * kymo eval CLI.
  *
- *   npx tsx eval/src/main.ts run --model oracle --split dev --experiment target --limit 10 [--set ui]
- *   npx tsx eval/src/main.ts tasks          regenerate eval/tasks/{synthetic,ui}.json from ground truth
- *   npx tsx eval/src/main.ts ui-capture     capture the UI scenes in Chromium, record their truth,
+ *   bun run eval run --model oracle --split dev --experiment target --limit 10 [--set ui]
+ *   bun run eval tasks          regenerate eval/tasks/{synthetic,ui}.json from ground truth
+ *   bun run eval ui-capture     capture the UI scenes in Chromium, record their truth,
  *                                           and regenerate eval/tasks/ui.json from it
- *   npx tsx eval/src/main.ts experiments    list experiments and their variants
- *   npx tsx eval/src/main.ts export --out DIR --key DIR [--split dev|heldout|all] [--set S]
+ *   bun run eval experiments    list experiments and their variants
+ *   bun run eval export --out DIR --key DIR [--split dev|heldout|all] [--set S]
  *                                           questions for an outside agent; the key goes elsewhere
- *   npx tsx eval/src/main.ts score --key DIR/key.json --answers answers.json [--set S]
+ *   bun run eval score --key DIR/key.json --answers answers.json [--set S]
  *
  * Reports go to eval/reports/runs/<timestamp>/; progress goes to stderr.
  */
@@ -42,7 +42,7 @@ const PATHS = {
   cache: join(ROOT, "eval/.cache"),
   runs: join(ROOT, "eval/reports/runs")
 }
-const DEFAULT_SERVER = "npx tsx apps/cli/src/bin.ts mcp"
+const DEFAULT_SERVER = "node apps/cli/bin/kymo.js mcp"
 
 const err = (line: string) => process.stderr.write(`${line}\n`)
 
@@ -100,7 +100,7 @@ const loadSet = (set: TaskSetArg) =>
         `Skipping ${missing.length} UI tasks whose footage is not cached (${missing
           .slice(0, 3)
           .map((t) => t.id)
-          .join(", ")}${missing.length > 3 ? ", …" : ""}). Run \`npm run eval -- ui-capture\` first.`
+          .join(", ")}${missing.length > 3 ? ", …" : ""}). Run \`bun run eval -- ui-capture\` first.`
       )
     return [...synthetic, ...ui.filter((t) => !missing.includes(t))]
   })

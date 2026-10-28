@@ -72,16 +72,16 @@ On variable-frame-rate footage and GIFs, seconds are real time and frames are de
 
 ## Quick start
 
-You need Node 24 and ffmpeg.
+You need Node 24, [Bun](https://bun.sh) and ffmpeg. Bun installs and runs the scripts; kymo itself runs on Node.
 
 ```sh
 brew install ffmpeg            # or: sudo apt install ffmpeg
 git clone https://github.com/tylergibbs1/kymo && cd kymo
-npm install
-npm run --silent kymo -- scan "synthetic:bounce?impact=20" --budget 8
+bun install
+bun run --silent kymo -- scan "synthetic:bounce?impact=20" --budget 8
 ```
 
-Point it at your own video the same way: `npm run --silent kymo -- probe clip.mp4`. More commands are in the [video reference](skills/kymo/references/video.md).
+Point it at your own video the same way: `bun run --silent kymo -- probe clip.mp4`. More commands are in the [video reference](skills/kymo/references/video.md).
 
 ### Use it from an agent (MCP)
 

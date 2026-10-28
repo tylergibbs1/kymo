@@ -18,7 +18,7 @@ describe("synthetic task generation", () => {
       assert.deepStrictEqual(
         onDisk,
         generated,
-        "eval/tasks/synthetic.json is stale: run `npm run eval -- tasks`"
+        "eval/tasks/synthetic.json is stale: run `bun run eval -- tasks`"
       )
     })
   )

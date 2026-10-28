@@ -246,6 +246,6 @@ export const generateUi = (truth: TruthFile, cases: ReadonlyArray<UiCase> = UI_C
     const key = captureKey(k.capture)
     const found = truth.captures.find((c) => c.key === key)
     return found === undefined
-      ? fail(k.id, `no recorded truth for capture ${key}: run \`npm run eval -- ui-capture\``)
+      ? fail(k.id, `no recorded truth for capture ${key}: run \`bun run eval -- ui-capture\``)
       : buildUiTask(k, found)
   })
