@@ -1,0 +1,4 @@
+node_modules
+.kymo
+*.tsbuildinfo
+eval/reports/runs
