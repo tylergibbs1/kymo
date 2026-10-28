@@ -26,7 +26,7 @@ On variable-frame-rate sources (`vfr: true`: phone and screen recordings, GIFs),
 ## The loop
 
 1. **probe** the source: fps, duration, size, tracks, markers. Cheap, no images. `as=hero` names it; a name already used for another source is refused (pass `replace` to rebind it and drop its markers).
-2. **scan** with a small budget (6–12) for an overview. Use `sample=motion` to spend frames where things change; cuts are always included. Read the motion-energy summary and the suggested next ranges. Scan saves what it finds as markers on the source (`@cut1`, `@peak1`), so later calls can address them. A saved marker never moves or changes name: a later scan, ranged or not, reports a cut it already knows under its old name and numbers new ones after the highest. A cut's `incoming` is the first frame showing the new shot (for a fade, the first mixed frame); its `address` is the middle of a fade.
+2. **scan** with a small budget (6–12) for an overview. Use `sample=motion` to spend frames where things change; cuts take at most half the budget, and any left out are named in `note`. Read the motion-energy summary and the suggested next ranges. Scan saves what it finds as markers on the source (`@cut1`, `@peak1`), so later calls can address them. A saved marker never moves or changes name: a later scan, ranged or not, reports a cut it already knows under its old name and numbers new ones after the highest. A cut's `incoming` is the first frame showing the new shot (for a fade, the first mixed frame); its `address` is the middle of a fade.
 3. **frames** at the interesting addresses. Pick the view for the question:
    - `sheet`: what happens at these moments
    - `onion`: path and spacing of a motion (easing, arcs)

@@ -78,7 +78,6 @@ export interface LabelContext {
   readonly who: string
   /** Shown after `who` when it is not a plain sheet: `diff`, `onion`, `follow 120,80,64,64`. */
   readonly view?: string
-  /** Unused: each image carries its own `sheet` of `sheets`. Kept so existing callers still compile. */
   readonly format: Format
   readonly labelStyle: Address.LabelStyle
 }
