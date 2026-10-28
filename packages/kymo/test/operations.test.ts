@@ -82,6 +82,17 @@ describe("probe", () => {
       expect(again.input).toBe(BOUNCE)
     }).pipe(Effect.provide(fresh))
   )
+
+  it.effect("as names the source while probing, from a path or an existing handle", () =>
+    Effect.gen(function* () {
+      const named = yield* call(probe, { source: BOUNCE, as: "ball" })
+      expect(named.handle).toBe("ball")
+      expect((yield* call(probe, { source: "ball" })).input).toBe(BOUNCE)
+      const shots = yield* call(probe, { source: "synthetic:cut" })
+      const renamed = yield* call(probe, { source: shots.handle, as: "shots" })
+      expect(renamed).toMatchObject({ handle: "shots", input: "synthetic:cut" })
+    }).pipe(Effect.provide(fresh))
+  )
 })
 
 describe("frames", () => {

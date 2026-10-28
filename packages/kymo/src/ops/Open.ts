@@ -1,15 +1,14 @@
 import { Timeline } from "@kymo/core"
 import { Workspace } from "@kymo/sources"
 import { Effect, Schema } from "effect"
+import { As } from "../Fields.ts"
 import { define } from "../Operation.ts"
 
 export const OpenInput = Schema.Struct({
   src: Schema.String.check(Schema.isMinLength(1)).annotate({
     description: "A video path, a directory of numbered images, or a synthetic:<scene>?… spec."
   }),
-  as: Schema.optionalKey(
-    Schema.String.annotate({ description: "The handle to use, e.g. hero. Default: the next free clipN." })
-  ),
+  as: Schema.optionalKey(As),
   offset: Schema.optionalKey(
     Schema.Int.annotate({ description: "Frames to shift this source by when aligning it with others." })
   )

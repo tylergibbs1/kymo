@@ -14,6 +14,11 @@ export const Source = Schema.String.check(Schema.isMinLength(1)).annotate({
     "What to look at: a video path (clip.mp4), a directory of numbered images, a synthetic:<scene>?… spec, or a handle from an earlier call (clip1)."
 })
 
+/** The handle to give a source; shared by every operation that can name one, so they accept it alike. */
+export const As = Schema.String.check(Schema.isMinLength(1)).annotate({
+  description: "The handle to use for this source, e.g. hero. Default: the next free clipN."
+})
+
 export const Address = Schema.String.check(Schema.isMinLength(1)).annotate({
   description: "A frame address: 08s10f, #250, 8.33s, -1f, @impact+5f, or a range 2s..4s:2f."
 })
