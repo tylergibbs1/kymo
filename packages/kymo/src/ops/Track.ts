@@ -1,12 +1,14 @@
 import {
   EasingFit,
-  type FrameRange,
+  FrameRange,
   LostReason,
   type Precision,
   type RegionTrack,
+  Unfit,
   fitEasing,
   keyframeIndices,
-  knownSamples
+  knownSamples,
+  unitScale
 } from "@kymo/analysis"
 import {
   Address,
@@ -21,7 +23,7 @@ import { Workspace } from "@kymo/sources"
 import { plot as plotView } from "@kymo/views"
 import { Effect, Result, Schema } from "effect"
 import { BoxText, Format, Range, Source as SourceField, TargetInput } from "../Fields.ts"
-import { analysisRange } from "../Frames.ts"
+import { analysisRange, resolveAddresses } from "../Frames.ts"
 import { define } from "../Operation.ts"
 import { OutputDir } from "../OutputDir.ts"
 import { measureBox } from "../Region.ts"
@@ -35,7 +37,18 @@ const fields = {
         "Which values to return. With box: x, y, w, h, confidence (default x, y, confidence). Without: names of the source's own tracks from probe, e.g. box.x (default all)."
     })
   ),
-  range: Schema.optionalKey(Range),
+  range: Schema.optionalKey(
+    Range.annotate({
+      description:
+        "A contiguous range like 2s..4s, #30..#90 or @cut1..-1f. Default: the whole source. With box, a range written backwards (30f..12f) tracks back in time from its first address, where the box is."
+    })
+  ),
+  anchor: Schema.optionalKey(
+    Schema.String.check(Schema.isMinLength(1)).annotate({
+      description:
+        "With box: the frame the box describes, e.g. 30f; tracking runs forwards and backwards from it. Default: the first address of range as written. Read the box off the frame where the subject is fully visible."
+    })
+  ),
   plot: Schema.Boolean.annotate({ description: "Also draw the tracks as a chart image." }).pipe(
     Schema.withDecodingDefaultKey(Effect.succeed(false))
   ),
@@ -52,7 +65,8 @@ export const TrackInput = Schema.Union([
   Schema.Struct({
     ...fields,
     box: BoxText.annotate({
-      description: "Region to follow, as it is at the first frame of the range: x,y,w,h in source pixels."
+      description:
+        "Region to follow, as it is at the anchor frame (the first address of range unless anchor is given): x,y,w,h in source pixels."
     })
   }),
   Schema.Struct({
@@ -105,14 +119,26 @@ export const TrackOutput = Schema.Struct({
   }),
   tracks: Schema.Array(TrackSeries),
   plot: Schema.NullOr(Sheet),
-  easing: Schema.Array(EasingFit),
+  easing: Schema.Array(EasingFit).annotate({
+    description:
+      "One fit per track whose whole motion was seen: each end at a rest, the range bound, or where the subject appeared or disappeared (then that end is estimated; see start and end)."
+  }),
+  easingSkipped: Schema.optionalKey(
+    Schema.Array(Unfit).annotate({
+      description:
+        "With fitEasing: each track that got no fit, and why: lost, partial (part of the motion not seen), too-few-samples or no-motion."
+    })
+  ),
+  anchor: Schema.optionalKey(
+    Schema.String.annotate({ description: "The frame the box describes; tracking runs both ways from it." })
+  ),
   lost: Schema.Array(
     Schema.Struct({
       range: Schema.String.annotate({ description: "The frames with no position, e.g. 26f..01s15f." }),
       frames: Schema.Int.annotate({ description: "How many frames that is." }),
       reason: LostReason.annotate({
         description:
-          "low-confidence: the box no longer matches what it showed at the first frame. edge: the box ran into the frame edge."
+          "low-confidence: something is there but it does not match what the box showed at the anchor frame. edge: the subject is past the frame edge, almost entirely outside the frame. faded: nothing like the subject is where it was (it faded out or was hidden)."
       })
     })
   ).annotate({
@@ -124,14 +150,11 @@ export const TrackOutput = Schema.Struct({
 
 const invalid = (message: string, hint: string) => Effect.fail(new InvalidInput({ message, hint }))
 
-/** Measurement noise by unit: a measured wobble below this is not a turning point. */
-const NOISE: Readonly<Record<string, number>> = { px: 0.5, "0..1": 0.01, ratio: 0.01 }
-
 const summary = (track: Track, range: FrameRange, method: Measured["method"], role: Role) => {
   const values = knownSamples(track, range).map(([, v]) => v)
   if (values.length === 0) return { min: null, max: null, keyframes: [] }
   const precision: Precision =
-    method === "source" ? { _tag: "source" } : { _tag: "measured", noise: NOISE[track.unit] ?? 0 }
+    method === "source" ? { _tag: "source" } : { _tag: "measured", noise: unitScale(track.unit).noise }
   return {
     min: Math.min(...values),
     max: Math.max(...values),
@@ -159,8 +182,54 @@ interface Measured {
   readonly region?: RegionTrack
 }
 
+/** The frames to measure and the frame the box describes. */
+interface Frames {
+  readonly range: FrameRange
+  readonly anchor: number
+}
+
+/**
+ * The range and anchor. A range written backwards (30f..12f) covers 12f..30f and anchors at 30f, so
+ * a box read off the frame where the subject is fully visible can be followed back to where it appears.
+ */
+const framesOf = (input: TrackInput, timeline: Source["timeline"]): Effect.Effect<Frames, KymoError> =>
+  Effect.gen(function* () {
+    const text = input.range
+    let frames: Frames | undefined
+    if (text !== undefined) {
+      const address = yield* Address.parseEffect(text)
+      const prefix = address.handle === undefined ? "" : `${address.handle}@`
+      const ends = text.slice(prefix.length).split("..")
+      if (address.spec._tag === "Range" && address.spec.step === undefined && ends.length === 2) {
+        const [from] = yield* resolveAddresses(timeline, [prefix + ends[0]!])
+        const [to] = yield* resolveAddresses(timeline, [prefix + ends[1]!])
+        if (from !== undefined && to !== undefined && to < from)
+          frames = { range: yield* FrameRange.parse(timeline, `#${to}..#${from}`), anchor: from }
+      }
+    }
+    if (frames === undefined) {
+      const range = yield* analysisRange(timeline, text)
+      frames = { range, anchor: range.first }
+    }
+    if (input.anchor === undefined) return frames
+    if (!("box" in input))
+      return yield* invalid(
+        "anchor says which frame a box describes; this call has no box.",
+        "Pass box=x,y,w,h as the subject is at that frame, e.g. box=120,80,64,64 anchor=30f, or drop anchor."
+      )
+    const at = yield* resolveAddresses(timeline, [input.anchor])
+    const { range } = frames
+    const span = range.spanText(range.first, range.last)
+    if (at.length !== 1 || at[0]! < range.first || at[0]! > range.last)
+      return yield* invalid(
+        `anchor ${input.anchor} is not one frame inside ${span}.`,
+        `Pass one frame inside the range, e.g. anchor=${Address.format(range.rate, range.last)}, or widen the range to include it.`
+      )
+    return { range, anchor: at[0]! }
+  })
+
 /** The tracks the caller asked for: measured from a box, or read from the source. */
-const measure = (input: TrackInput, source: Source, range: FrameRange): Effect.Effect<Measured, KymoError> =>
+const measure = (input: TrackInput, source: Source, frames: Frames): Effect.Effect<Measured, KymoError> =>
   Effect.gen(function* () {
     const { timeline } = source
     if ("select" in input)
@@ -169,7 +238,7 @@ const measure = (input: TrackInput, source: Source, range: FrameRange): Effect.E
         "Pass box=x,y,w,h in source pixels instead, e.g. box=120,80,64,64 (use view=grid in frames to find it)."
       )
     if ("box" in input) {
-      const region = yield* measureBox(source, range, input.box)
+      const region = yield* measureBox(source, frames.range, input.box, frames.anchor)
       const byProp = { x: region.x, y: region.y, w: region.w, h: region.h, confidence: region.confidence }
       const wanted = (input.props ?? ["x", "y", "confidence"]).map((p) => p.replace(/^box\./, ""))
       const unknown = wanted.filter((p) => !(REGION_PROPS as ReadonlyArray<string>).includes(p))
@@ -197,23 +266,34 @@ const measure = (input: TrackInput, source: Source, range: FrameRange): Effect.E
     return { method: "source", tracks: tracks.map((track) => ({ track, role: "value" as const })) }
   })
 
-/** What to tell the caller about a lost box: a wrong starting box, or the subject leaving the frame. */
-const lostNotes = (input: TrackInput, region: RegionTrack, range: FrameRange, handle: string) => {
+/** What to tell the caller about a lost box: a wrong box at the anchor, or the subject leaving or fading. */
+const lostNotes = (input: TrackInput, region: RegionTrack, frames: Frames, handle: string) => {
+  const { range, anchor } = frames
   const notes: Array<string> = []
-  const [first] = region.lost
-  if (first?.reason === "low-confidence" && first.from.index === range.first + 1 && "box" in input) {
-    const at = Address.format(range.rate, range.first)
+  const next = region.lost.find((l) => l.from.index === anchor + 1 || l.to.index === anchor - 1)
+  if (next?.reason === "low-confidence" && "box" in input) {
+    const at = Address.format(range.rate, anchor)
+    const which = anchor === range.first ? "the first frame of the range" : "the anchor frame"
     const [, , w, h] = input.box.split(",").map((p) => p.trim())
     const rangeFlag = input.range === undefined ? "" : ` --range ${input.range}`
+    const anchorFlag = input.anchor === undefined ? "" : ` --anchor ${input.anchor}`
     notes.push(
-      `Lost the box right after ${at}: the box must be where the subject is at ${at}, the first frame of the range. Look with kymo frames ${handle} --at ${at} --view grid, then pass the box you see there, e.g. kymo track ${handle}${rangeFlag} --box x,y,${w},${h}.`
+      `Lost the box right next to ${at}: the box must be where the subject is at ${at}, ${which}. Look with kymo frames ${handle} --at ${at} --view grid, then pass the box you see there, e.g. kymo track ${handle}${rangeFlag}${anchorFlag} --box x,y,${w},${h}.`
     )
   }
-  const edge = region.lost.filter((l) => l.reason === "edge")
-  if (edge.length > 0)
+  const spans = (reason: LostReason) =>
+    region.lost
+      .filter((l) => l.reason === reason)
+      .map((l) => range.spanText(l.from.index, l.to.index))
+      .join(", ")
+  const edge = spans("edge")
+  if (edge !== "")
     notes.push(
-      `No position in ${edge.map((l) => range.spanText(l.from.index, l.to.index)).join(", ")}: the box reached the frame edge, so part of the subject is outside the frame.`
+      `No position in ${edge}: the subject is past the frame edge there, almost entirely outside the frame.`
     )
+  const faded = spans("faded")
+  if (faded !== "")
+    notes.push(`No position in ${faded}: the subject is not visible there (faded out or hidden).`)
   return notes
 }
 
@@ -221,11 +301,12 @@ export const track = define({
   name: "track",
   title: "Measure motion",
   description:
-    "Measure motion as numbers: positions per frame of a region you name with box (template matching), or the source's own tracks (synthetic ground truth, telemetry). Returns keyframes (turning points: where it starts, stops and reverses, at exact frames); pass format=detailed for every frame's sample. Also an optional chart image, an optional easing fit, and where a box was lost. The box must be where the subject is at the first frame of the range. Prefer these numbers over estimating positions from pixels; use check to test them against rules or assertions.",
+    "Measure motion as numbers: positions per frame of a region you name with box (template matching), or the source's own tracks (synthetic ground truth, telemetry). Returns keyframes (turning points: where it starts, stops and reverses, at exact frames); pass format=detailed for every frame's sample. Also an optional chart image, an optional easing fit (only for a motion seen whole; easingSkipped says why a track has none), and where a box was lost. The box must be where the subject is at the anchor frame: the first address of range, so a range written backwards (30f..12f) follows a box read at 30f back to 12f; or pass anchor. w and h are measured: they follow the subject's scale. Prefer these numbers over estimating positions from pixels; use check to test them against rules or assertions.",
   cost: "no images unless plot=true; then 1 chart image, ≤4784 visual tokens at high-res",
   examples: [
     { source: "synthetic:ease?easing=ease-out", props: ["box.x"], fitEasing: true },
     { source: "clips/launch.mp4", box: "120,80,64,64", range: "1s..3s", plot: true },
+    { source: "clips/modal.mp4", box: "400,220,480,280", range: "30f..12f", fitEasing: true },
     { source: "clip1", props: ["box.x", "box.y"], format: "detailed" }
   ],
   input: TrackInput,
@@ -237,8 +318,9 @@ export const track = define({
     const output = yield* OutputDir
     const source = yield* workspace.open(input.source)
     const { timeline } = source
-    const range = yield* analysisRange(timeline, input.range)
-    const measured = yield* measure(input, source, range)
+    const frames = yield* framesOf(input, timeline)
+    const { range } = frames
+    const measured = yield* measure(input, source, frames)
     const detailed = input.format === "detailed"
     const series: Array<TrackSeries> = measured.tracks.map(({ track: t, role }) => ({
       name: t.name,
@@ -273,18 +355,15 @@ export const track = define({
           target: input.target
         })
       : undefined
+    const lost = measured.region?.lost ?? []
     const fits = input.fitEasing
-      ? measured.tracks
-          .filter((m) => m.role === "value")
-          .map(({ track: t }) => [t.name, fitEasing(t, range)] as const)
+      ? measured.tracks.filter((m) => m.role === "value").map(({ track: t }) => fitEasing(t, range, { lost }))
       : []
-    const still = fits.filter(([, r]) => Result.isFailure(r)).map(([name]) => name)
+    const skipped = fits.flatMap((r) => (Result.isFailure(r) ? [r.failure] : []))
     const span = range.spanText(range.first, range.last)
     const notes = [
-      ...(measured.region === undefined ? [] : lostNotes(input, measured.region, range, timeline.handle)),
-      ...(still.length > 0
-        ? [`No easing fit for ${still.join(", ")}: it does not change enough in ${span}.`]
-        : []),
+      ...(measured.region === undefined ? [] : lostNotes(input, measured.region, frames, timeline.handle)),
+      ...skipped.map((u) => `No easing fit for ${u.track} (${u.status}): ${u.reason}`),
       ...(detailed ? [] : [CONCISE_NOTE])
     ]
     return {
@@ -300,8 +379,10 @@ export const track = define({
               `Plot · ${timeline.handle} · ${span.replace("..", "–")} · ${tracks.map((t) => t.name).join(", ")}`,
               input.format
             ),
-      easing: fits.flatMap(([, r]) => (Result.isSuccess(r) ? [r.success] : [])),
-      lost: (measured.region?.lost ?? []).map((l) => ({
+      easing: fits.flatMap((r) => (Result.isSuccess(r) ? [r.success] : [])),
+      ...(input.fitEasing ? { easingSkipped: skipped } : {}),
+      ...(measured.region === undefined ? {} : { anchor: Address.format(range.rate, frames.anchor) }),
+      lost: lost.map((l) => ({
         range: range.spanText(l.from.index, l.to.index),
         frames: l.to.index - l.from.index + 1,
         reason: l.reason
