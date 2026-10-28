@@ -9,6 +9,35 @@ const spawnThroughRun = {
   message: "Spawn processes through packages/sources/src/video/Run.ts so they are killed on interrupt."
 }
 
+/**
+ * A doc comment on a Schema.Struct field is invisible to agents: `kymo schema` and MCP tool schemas
+ * only carry `.annotate({ description })`. In the operation contract, describe fields that way.
+ */
+const schemaFieldDescriptions = {
+  meta: {
+    type: "problem",
+    messages: {
+      jsdoc:
+        "Describe Schema fields with .annotate({ description }), not a doc comment: comments never reach `kymo schema`."
+    }
+  },
+  create(context) {
+    const isStruct = (call) =>
+      call?.type === "CallExpression" &&
+      call.callee.type === "MemberExpression" &&
+      call.callee.object.name === "Schema" &&
+      call.callee.property.name === "Struct"
+    return {
+      Property(node) {
+        if (node.parent.type !== "ObjectExpression" || !isStruct(node.parent.parent)) return
+        for (const c of context.sourceCode.getCommentsBefore(node))
+          if (c.type === "Block" && c.value.startsWith("*"))
+            context.report({ loc: c.loc, messageId: "jsdoc" })
+      }
+    }
+  }
+}
+
 export default tseslint.config(
   { ignores: ["**/node_modules/**", "eval/reports/**"] },
   ...tseslint.configs.recommended,
@@ -28,6 +57,11 @@ export default tseslint.config(
     rules: {
       "no-restricted-syntax": ["error", noConsoleLog, spawnThroughRun]
     }
+  },
+  {
+    files: ["packages/kymo/src/**/*.ts"],
+    plugins: { kymo: { rules: { "schema-field-descriptions": schemaFieldDescriptions } } },
+    rules: { "kymo/schema-field-descriptions": "error" }
   },
   {
     // Labels drawn on images and shown before them follow the server's label style, which reaches

@@ -12,6 +12,8 @@ export const Cut = Schema.Struct({
   from: FrameRef,
   /** First frame fully in the incoming shot. */
   to: FrameRef,
+  /** First frame where the incoming shot is visible: the new frame of a hard cut, the first mixed frame of a fade. */
+  incoming: FrameRef,
   /** Histogram distance across the transition, 0..1. */
   score: Schema.Number
 })
@@ -111,6 +113,8 @@ export const detectCuts = (scan: Scan): Cuts => {
         marker: { name: `cut${i + 1}`, index: ref.index, address: ref.address, origin: "cut" },
         from: range.ref(x.from),
         to: range.ref(x.to),
+        // Every transition starts on the frame after the outgoing shot's last one.
+        incoming: range.ref(x.from + 1),
         score: round(x.score)
       }
     })

@@ -66,9 +66,10 @@ export const TrackSeries = Schema.Struct({
   unit: Schema.String,
   min: Schema.NullOr(Schema.Number),
   max: Schema.NullOr(Schema.Number),
-  /** Turning points: the first and last known values, where it starts or stops moving, and where it reverses. */
-  keyframes: Schema.Array(Keyframe),
-  /** Detailed only: every frame of the range; null where unknown (e.g. the tracked region was lost). */
+  keyframes: Schema.Array(Keyframe).annotate({
+    description:
+      "Turning points: the first and last known values, where it starts or stops moving, and where it reverses."
+  }),
   samples: Schema.optionalKey(
     Schema.Array(
       Schema.Struct({
@@ -77,7 +78,10 @@ export const TrackSeries = Schema.Struct({
         t: Schema.Number,
         value: Schema.NullOr(Schema.Number)
       })
-    )
+    ).annotate({
+      description:
+        "Detailed only: every frame of the range; null where unknown (e.g. the tracked region was lost)."
+    })
   )
 })
 type TrackSeries = typeof TrackSeries.Type
@@ -85,8 +89,10 @@ type TrackSeries = typeof TrackSeries.Type
 export const TrackOutput = Schema.Struct({
   handle: Schema.String,
   range: Schema.String,
-  /** source: the source's own (ground-truth or telemetry) tracks. template: measured by following the box. */
-  method: Schema.Literals(["source", "template"]),
+  method: Schema.Literals(["source", "template"]).annotate({
+    description:
+      "source: the source's own (ground-truth or telemetry) tracks. template: measured by following the box."
+  }),
   tracks: Schema.Array(TrackSeries),
   plot: Schema.NullOr(Sheet),
   easing: Schema.Array(EasingFit),

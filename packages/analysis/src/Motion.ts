@@ -2,7 +2,7 @@ import { FrameRef, Marker, Track, fpsOf } from "@kymo/core"
 import { Schema } from "effect"
 import type { Cuts } from "./Cuts.ts"
 import type { Scan } from "./Scan.ts"
-import { mean, round, std } from "./Stats.ts"
+import { mean, round, std, summarize } from "./Stats.ts"
 
 export const MOTION_TRACK = "motion"
 
@@ -22,6 +22,8 @@ export type MotionWindow = typeof MotionWindow.Type
 export const Motion = Schema.Struct({
   /** `motion`: mean absolute luma difference from the previous frame, 0..1. Null outside the range. */
   track: Track,
+  /** min, mean, max, maxAt and stillRatio summarise the same frames: those inside a shot. */
+  min: Schema.Number,
   mean: Schema.Number,
   max: Schema.Number,
   maxAt: FrameRef,
@@ -38,17 +40,24 @@ export const STILL_FLOOR = 0.002
 const MAX_PEAKS = 5
 const MAX_WINDOWS = 3
 
-/** Per-frame energy over the scan, with cut transitions zeroed: a cut is a change of shot, not motion. */
-export const shotEnergy = (scan: Scan, cuts: Cuts): Array<number> => {
+/**
+ * Per-frame energy over the scan; null where unknown (no frame before it) or across a cut
+ * transition: a cut is a change of shot, not motion.
+ */
+const knownShotEnergy = (scan: Scan, cuts: Cuts): Array<number | null> => {
   const first = scan.range.first
-  const energy = scan.frames.map((f) => f.motion ?? 0)
+  const energy = scan.frames.map((f) => f.motion)
   for (const c of cuts.cuts) {
     for (let i = c.from.index + 1; i <= c.to.index; i++) {
-      if (i - first >= 0 && i - first < energy.length) energy[i - first] = 0
+      if (i - first >= 0 && i - first < energy.length) energy[i - first] = null
     }
   }
   return energy
 }
+
+/** Per-frame energy over the scan, with unknown frames and cut transitions as 0. */
+export const shotEnergy = (scan: Scan, cuts: Cuts): Array<number> =>
+  knownShotEnergy(scan, cuts).map((v) => v ?? 0)
 
 const findPeaks = (energy: ReadonlyArray<number>, separation: number): Array<number> => {
   const floor = Math.max(STILL_FLOOR, mean(energy) + std(energy))
@@ -90,20 +99,19 @@ export const motionEnergy = (scan: Scan, cuts: Cuts): Motion => {
   const fps = fpsOf(range.rate)
   const samples: Array<number | null> = Array.from({ length: range.frameCount }, () => null)
   for (const f of scan.frames) samples[f.index] = f.motion === null ? null : round(f.motion, 6)
-  const energy = shotEnergy(scan, cuts)
-  const known = scan.frames.flatMap((f) => (f.motion === null ? [] : [f.motion]))
-  let maxK = 0
-  energy.forEach((v, k) => {
-    if (v > energy[maxK]!) maxK = k
-  })
+  const known = knownShotEnergy(scan, cuts)
+  const energy = known.map((v) => v ?? 0)
+  const summary = summarize(known)
+  const still = known.filter((v) => v !== null && v < STILL_FLOOR).length
   const peaks = findPeaks(energy, Math.max(2, Math.round(fps / 4)))
   const windowLength = Math.max(1, Math.min(energy.length, Math.round(fps)))
   return {
     track: { name: MOTION_TRACK, unit: "0..1", samples },
-    mean: round(mean(known), 6),
-    max: round(energy[maxK]!, 6),
-    maxAt: range.ref(range.first + maxK),
-    stillRatio: round(known.filter((v) => v < STILL_FLOOR).length / Math.max(1, known.length)),
+    min: round(summary.min, 6),
+    mean: round(summary.mean, 6),
+    max: round(summary.max, 6),
+    maxAt: range.ref(range.first + summary.maxAt),
+    stillRatio: round(still / Math.max(1, summary.count)),
     peaks: peaks.map((k, i) => {
       const ref = range.ref(range.first + k)
       return {

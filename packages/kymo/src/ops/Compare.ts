@@ -48,14 +48,15 @@ export const CompareOutput = Schema.Struct({
   view: Schema.Literals(["side", "diff"]),
   frames: Schema.Array(SheetFrame),
   sheets: Schema.Array(Sheet),
-  /** Per address: how different A and B look, 0 (identical) to 1. Every requested frame, not just this page. */
-  changes: Schema.Array(FrameDifference),
+  changes: Schema.Array(FrameDifference).annotate({
+    description:
+      "Per address: how different A and B look, 0 (identical) to 1. Every requested frame, not just this page."
+  }),
   summary: Schema.Struct({
     mean: Schema.Number,
     max: Schema.Number,
     maxAt: Schema.String,
-    /** Frames whose mean difference is above 0.01. */
-    changed: Schema.Int
+    changed: Schema.Int.annotate({ description: "Frames whose mean difference is above 0.01." })
   }),
   next: Schema.NullOr(Cursor),
   note: Schema.optionalKey(Schema.String)

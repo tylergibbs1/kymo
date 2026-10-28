@@ -68,20 +68,24 @@ type FramesInput = typeof FramesInput.Type
 
 export const FrameValues = Schema.Struct({
   address: Schema.String,
-  /** Track name → value at this frame (null where unknown). */
-  values: Schema.Record(Schema.String, Schema.NullOr(Schema.Number))
+  values: Schema.Record(Schema.String, Schema.NullOr(Schema.Number)).annotate({
+    description: "Track name → value at this frame (null where unknown)."
+  })
 })
 
 export const FramesOutput = Schema.Struct({
   handle: Schema.String,
   view: FramesView,
-  /** Every frame requested, in time order. */
-  frames: Schema.Array(SheetFrame),
+  frames: Schema.Array(SheetFrame).annotate({ description: "Every frame requested, in time order." }),
   sheets: Schema.Array(Sheet),
-  /** Detailed only: markers within the requested frames. */
-  markers: Schema.optionalKey(Schema.Array(Marker)),
-  /** Detailed only: the source's numeric tracks at each requested frame. */
-  samples: Schema.optionalKey(Schema.Array(FrameValues)),
+  markers: Schema.optionalKey(
+    Schema.Array(Marker).annotate({ description: "Detailed only: markers within the requested frames." })
+  ),
+  samples: Schema.optionalKey(
+    Schema.Array(FrameValues).annotate({
+      description: "Detailed only: the source's numeric tracks at each requested frame."
+    })
+  ),
   next: Schema.NullOr(Cursor),
   note: Schema.optionalKey(Schema.String)
 }).annotate({ identifier: "FramesOutput" })

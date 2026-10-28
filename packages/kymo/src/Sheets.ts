@@ -8,8 +8,9 @@ import type { Format } from "./Fields.ts"
 export const SheetFrame = Schema.Struct({
   address: Schema.String,
   index: FrameIndex,
-  /** Presentation time in seconds. Detailed only. */
-  t: Schema.optionalKey(Schema.Number)
+  t: Schema.optionalKey(
+    Schema.Number.annotate({ description: "Presentation time in seconds. Detailed only." })
+  )
 })
 export type SheetFrame = typeof SheetFrame.Type
 
@@ -19,14 +20,13 @@ export const Sheet = Schema.Struct({
     description:
       "Text that precedes the image, e.g. `Sheet 1 of 2 · clip1 · 0f–08s10f · 12 frames, every 20f`."
   }),
-  /** Frames the image covers, as in its file name: `0f-08s10f`. */
-  span: Schema.String,
-  /** Absolute path of the PNG. */
-  path: Schema.String,
-  /** Detailed only: image size and its cost in visual tokens. */
-  width: Schema.optionalKey(Schema.Int),
-  height: Schema.optionalKey(Schema.Int),
-  tokens: Schema.optionalKey(Schema.Int),
+  span: Schema.String.annotate({ description: "Frames the image covers, as in its file name: 0f-08s10f." }),
+  path: Schema.String.annotate({ description: "Absolute path of the PNG." }),
+  width: Schema.optionalKey(Schema.Int.annotate({ description: "Detailed only: image width in pixels." })),
+  height: Schema.optionalKey(Schema.Int.annotate({ description: "Detailed only: image height in pixels." })),
+  tokens: Schema.optionalKey(
+    Schema.Int.annotate({ description: "Detailed only: the image's cost in visual tokens." })
+  ),
   frames: Schema.Array(SheetFrame)
 })
 export type Sheet = typeof Sheet.Type

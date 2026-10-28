@@ -207,6 +207,39 @@ describe("scan", () => {
       expect(out.suggestions.some((s) => s.reason.includes("cut1"))).toBe(true)
     }).pipe(Effect.provide(fresh))
   )
+
+  it.effect("motion summary keeps min <= mean <= max on every scene, cuts included", () =>
+    Effect.gen(function* () {
+      for (const source of [
+        "synthetic:cut?at=45",
+        "synthetic:cut?at=45&fade=10",
+        BOUNCE,
+        "synthetic:flicker?at=40",
+        "synthetic:dropped?dups=5,50,51,52",
+        "synthetic:safe-area",
+        "synthetic:ease?easing=spring(170,12)"
+      ]) {
+        const { motion } = yield* call(scan, { source, budget: 2 })
+        expect(motion.min, source).toBeLessThanOrEqual(motion.mean)
+        expect(motion.mean, source).toBeLessThanOrEqual(motion.max)
+        for (const p of motion.peaks) expect(p.value, source).toBeLessThanOrEqual(motion.max)
+      }
+    }).pipe(Effect.provide(fresh))
+  )
+
+  it.effect("a cut's incoming is the first frame showing the new shot, hard or faded", () =>
+    Effect.gen(function* () {
+      const hard = yield* call(scan, { source: "synthetic:cut?at=45", budget: 2 })
+      expect(hard.cuts[0]).toMatchObject({ kind: "hard", incoming: "01s15f" })
+      const fade = yield* call(scan, { source: "synthetic:cut?at=45&fade=10", budget: 2 })
+      expect(fade.cuts[0]).toMatchObject({ kind: "fade", incoming: "01s15f", to: "01s25f" })
+      const cut = jsonSchema(scan.output)["properties"] as Record<string, Record<string, unknown>>
+      const fields = (cut["cuts"]!["items"] as { properties: Record<string, { description?: string }> })
+        .properties
+      for (const name of ["address", "from", "to", "incoming"])
+        expect(fields[name]!.description, name).toBeDefined()
+    }).pipe(Effect.provide(fresh))
+  )
 })
 
 describe("compare", () => {

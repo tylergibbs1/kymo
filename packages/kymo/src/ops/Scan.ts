@@ -37,57 +37,71 @@ export const ScanInput = Schema.Struct({
 }).annotate({ identifier: "ScanInput" })
 
 const Peak = Schema.Struct({
-  /** `peak1` is the strongest. Saved as a marker, addressable as `@peak1`. */
-  name: Schema.String,
-  address: Schema.String,
-  value: Schema.Number
+  name: Schema.String.annotate({
+    description: "peak1 is the strongest. Saved as a marker, addressable as @peak1."
+  }),
+  address: Schema.String.annotate({ description: "The frame of the peak." }),
+  value: Schema.Number.annotate({ description: "Motion energy at the peak, 0..1." })
 })
 const Window = Schema.Struct({
   range: Schema.String.annotate({ description: "Ready to pass as `range`." }),
-  mean: Schema.Number
+  mean: Schema.Number.annotate({ description: "Mean motion energy over the window, 0..1." })
 })
 
 export const ScanCut = Schema.Struct({
-  /** `cut1`. Saved as a marker, so later calls can address it as `@cut1` or `@cut1+5f`. */
-  name: Schema.String,
-  kind: Schema.Literals(["hard", "fade"]),
-  address: Schema.String,
-  /** Last frame of the outgoing shot and first frame fully in the incoming one. */
-  from: Schema.String,
-  to: Schema.String,
-  score: Schema.Number
+  name: Schema.String.annotate({
+    description: "cut1, cut2… in time order. Saved as a marker, so later calls can address @cut1 or @cut1+5f."
+  }),
+  kind: Schema.Literals(["hard", "fade"]).annotate({
+    description: "hard: the shot changes between two frames. fade: the shots mix over several frames."
+  }),
+  address: Schema.String.annotate({
+    description:
+      "The marker's frame: the first new frame of a hard cut, the middle of a fade. Where the new shot starts is incoming."
+  }),
+  from: Schema.String.annotate({ description: "Last frame showing only the outgoing shot." }),
+  to: Schema.String.annotate({ description: "First frame showing only the incoming shot." }),
+  incoming: Schema.String.annotate({
+    description:
+      "First frame where the incoming shot is visible: the first new frame of a hard cut (same as to), the first mixed frame of a fade (the frame after from)."
+  }),
+  score: Schema.Number.annotate({ description: "Histogram distance across the transition, 0..1." })
 })
 
 export const Suggestion = Schema.Struct({
   range: Schema.String.annotate({ description: "Ready to pass as `range` to frames, scan, track or check." }),
-  reason: Schema.String
+  reason: Schema.String.annotate({ description: "Why this range is worth a look." })
 })
 
 export const ScanOutput = Schema.Struct({
-  handle: Schema.String,
-  /** The range that was scanned. */
-  range: Schema.String,
-  /** The sampled frames, in time order. */
-  frames: Schema.Array(SheetFrame),
-  sheets: Schema.Array(Sheet),
+  handle: Schema.String.annotate({ description: "Pass as `source` in later calls." }),
+  range: Schema.String.annotate({ description: "The range that was scanned." }),
+  frames: Schema.Array(SheetFrame).annotate({ description: "The sampled frames, in time order." }),
+  sheets: Schema.Array(Sheet).annotate({ description: "Contact sheets of the sampled frames." }),
   motion: Schema.Struct({
-    /** Mean absolute luma change per frame, 0..1. */
-    mean: Schema.Number,
-    max: Schema.Number,
-    maxAt: Schema.String,
-    /** Fraction of frames that are still. */
-    stillRatio: Schema.Number,
-    /** Strongest first. */
-    peaks: Schema.Array(Peak),
-    /** About one second each, busiest first. */
-    windows: Schema.Array(Window),
-    /** Detailed only: energy per frame of the range, first frame first. */
-    energy: Schema.optionalKey(Schema.Array(Schema.NullOr(Schema.Number)))
-  }),
-  cuts: Schema.Array(ScanCut),
-  suggestions: Schema.Array(Suggestion),
+    min: Schema.Number.annotate({ description: "Least motion energy on a frame inside a shot, 0..1." }),
+    mean: Schema.Number.annotate({
+      description:
+        "Mean absolute luma change per frame, 0..1. min, mean, max, maxAt and stillRatio cover the same frames: those inside a shot, not across a cut."
+    }),
+    max: Schema.Number.annotate({ description: "Most motion energy on a frame inside a shot, 0..1." }),
+    maxAt: Schema.String.annotate({ description: "The frame of max." }),
+    stillRatio: Schema.Number.annotate({ description: "Fraction of frames inside a shot that are still." }),
+    peaks: Schema.Array(Peak).annotate({
+      description: "Motion peaks, strongest first. Cut frames are not peaks."
+    }),
+    windows: Schema.Array(Window).annotate({ description: "About one second each, busiest first." }),
+    energy: Schema.optionalKey(
+      Schema.Array(Schema.NullOr(Schema.Number)).annotate({
+        description:
+          "Detailed only: raw energy per frame of the range, first frame first, cut frames included; null where unknown."
+      })
+    )
+  }).annotate({ description: "Motion-energy summary." }),
+  cuts: Schema.Array(ScanCut).annotate({ description: "Detected cuts and fades, in time order." }),
+  suggestions: Schema.Array(Suggestion).annotate({ description: "Ranges worth a closer look, best first." }),
   next: Schema.NullOr(Cursor),
-  note: Schema.optionalKey(Schema.String)
+  note: Schema.optionalKey(Schema.String.annotate({ description: "What was left out and how to get it." }))
 }).annotate({ identifier: "ScanOutput" })
 
 const MAX_SUGGESTIONS = 4
@@ -183,6 +197,7 @@ export const scan = define({
       }),
       motion: {
         mean: motion.mean,
+        min: motion.min,
         max: motion.max,
         maxAt: motion.maxAt.address,
         stillRatio: motion.stillRatio,
@@ -196,6 +211,7 @@ export const scan = define({
         address: c.marker.address,
         from: c.from.address,
         to: c.to.address,
+        incoming: c.incoming.address,
         score: c.score
       })),
       suggestions,

@@ -14,6 +14,41 @@ export const robustSigma = (xs: ReadonlyArray<number>): number => {
   return 1.4826 * median(xs.map((x) => Math.abs(x - m)))
 }
 
+/** Min, max (with where, first wins), mean and count of the known values; all 0 when none is known. */
+export interface Summary {
+  readonly min: number
+  readonly max: number
+  /** Position of the first maximum in the input, or 0. */
+  readonly maxAt: number
+  readonly mean: number
+  readonly count: number
+}
+
+/**
+ * The one place summary statistics come from: every figure reads the same known values, so a mean
+ * can never fall outside its min and max.
+ */
+export const summarize = (values: ReadonlyArray<number | null>): Summary => {
+  let min = Infinity
+  let max = -Infinity
+  let maxAt = 0
+  let sum = 0
+  let count = 0
+  values.forEach((v, k) => {
+    if (v === null) return
+    if (v < min) min = v
+    if (v > max) {
+      max = v
+      maxAt = k
+    }
+    sum += v
+    count++
+  })
+  return count === 0
+    ? { min: 0, max: 0, maxAt: 0, mean: 0, count: 0 }
+    : { min, max, maxAt, mean: Math.min(max, Math.max(min, sum / count)), count }
+}
+
 export const std = (xs: ReadonlyArray<number>): number => {
   const m = mean(xs)
   return Math.sqrt(mean(xs.map((x) => (x - m) ** 2)))

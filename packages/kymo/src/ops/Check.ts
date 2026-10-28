@@ -41,9 +41,8 @@ export const CheckInput = Schema.Struct({
 export const SuggestedCall = Schema.Struct({
   tool: Schema.Literal("kymo_frames"),
   arguments: Schema.Struct({ source: Schema.String, at: Schema.Array(Schema.String), view: FramesView }),
-  /** The same call on the command line. */
-  command: Schema.String
-})
+  command: Schema.String.annotate({ description: "The same call on the command line." })
+}).annotate({ description: "The next call that shows the finding, ready to send as is." })
 
 const { suggest: _analysisSuggest, ...findingFields } = Finding.fields
 
@@ -53,13 +52,12 @@ export type CheckFinding = typeof CheckFinding.Type
 export const CheckOutput = Schema.Struct({
   handle: Schema.String,
   range: Schema.String,
-  /** The rules that ran. */
-  rules: Schema.Array(RuleName),
-  /** In frame order. */
-  findings: Schema.Array(CheckFinding),
+  rules: Schema.Array(RuleName).annotate({ description: "The rules that ran." }),
+  findings: Schema.Array(CheckFinding).annotate({ description: "Rule findings, in frame order." }),
   assertions: Schema.Array(AssertionResult),
-  /** True when every assertion passed and no finding is an error. */
-  pass: Schema.Boolean
+  pass: Schema.Boolean.annotate({
+    description: "True when every assertion passed and no finding is an error. Warnings do not fail a check."
+  })
 }).annotate({ identifier: "CheckOutput" })
 
 /**
