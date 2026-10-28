@@ -51,6 +51,15 @@ export const meanAbsDiff = (a: Gray, b: Gray): number => {
   return sum / (x.length * 255)
 }
 
+/** The largest per-pixel luma change between two images, in luma steps (0..255). */
+export const maxAbsDiff = (a: Gray, b: Gray): number => {
+  let most = 0
+  const x = a.data
+  const y = b.data
+  for (let i = 0; i < x.length; i++) most = Math.max(most, Math.abs(x[i]! - y[i]!))
+  return most
+}
+
 /** How many pixels changed by each amount: `levels[d]` counts pixels whose luma moved by exactly `d`. */
 export type DiffLevels = Uint32Array
 

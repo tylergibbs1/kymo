@@ -5,7 +5,7 @@ import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterAll, beforeAll } from "vitest"
-import { type Footage, dissolve, footage } from "./footage.ts"
+import { type Footage, dissolve, footage, slideshow } from "./footage.ts"
 
 const fresh = Layer.unwrap(
   Effect.map(
@@ -49,6 +49,19 @@ describe("cuts in encoded footage", () => {
     Effect.gen(function* () {
       const source = dissolve(clips, "dissolve-60", { fps: 24, offset: 2, seconds: 1, then: ["fps=60"] })
       expect(yield* cutsOf(source)).toEqual(["fade"])
+    }).pipe(Effect.provide(fresh))
+  )
+})
+
+describe("scan's budget", () => {
+  it.effect("names the cuts it had no room to show, and how to see them", () =>
+    Effect.gen(function* () {
+      const source = slideshow(clips, "slides", { slides: 14, each: 12, fps: 24 })
+      const out = yield* call(scan, { source, budget: 6 })
+      expect(out.cuts).toHaveLength(13)
+      expect(out.frames).toHaveLength(6)
+      expect(out.note).toMatch(/cuts? not shown: cut\d+/)
+      expect(out.note).toContain("sample=cuts")
     }).pipe(Effect.provide(fresh))
   )
 })

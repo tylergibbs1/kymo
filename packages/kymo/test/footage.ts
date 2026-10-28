@@ -106,3 +106,29 @@ export const dissolve = (
   )
   return out
 }
+
+/** Still slides of alternating dark and light colours, `each` frames apiece: a hard cut between every two. */
+export const slideshow = (
+  f: Footage,
+  name: string,
+  options: { readonly slides: number; readonly each: number; readonly fps: number }
+): string => {
+  const out = join(f.dir, `${name}.mp4`)
+  const colours = Array.from({ length: options.slides }, (_, n) =>
+    n % 2 === 0
+      ? `0x${(0x203050 + 0x080808 * n).toString(16)}`
+      : `0x${(0xc0b090 - 0x040404 * n).toString(16)}`
+  )
+  const seconds = options.each / options.fps
+  ffmpeg(
+    ...colours.flatMap((c) => ["-f", "lavfi", "-i", `color=c=${c}:s=320x180:r=${options.fps}:d=${seconds}`]),
+    "-filter_complex",
+    `${colours.map((_, n) => `[${n}:v]`).join("")}concat=n=${options.slides}:v=1:a=0,format=yuv420p`,
+    "-c:v",
+    "libx264",
+    "-crf",
+    "20",
+    out
+  )
+  return out
+}

@@ -1,5 +1,6 @@
 import {
   Budget,
+  type Cut,
   type Cuts,
   type FrameRange,
   type Motion,
@@ -30,7 +31,7 @@ export const ScanInput = Schema.Struct({
     .pipe(Schema.withDecodingDefaultKey(Effect.succeed(12))),
   sample: SampleStrategy.annotate({
     description:
-      "How to spend the budget: motion (default) puts frames where things change, even spaces them evenly, cuts shows both sides of every cut. First, last and cut frames are always included."
+      "How to spend the budget: motion (default) puts frames where things change, even spaces them evenly, cuts shows both sides of every cut. motion keeps first, last and the strongest cuts (at most half the budget), skips frames repeating a picture already shown, and leaves room for motion; cuts that do not fit are named in note."
   }).pipe(Schema.withDecodingDefaultKey(Effect.succeed("motion" as const))),
   target: TargetInput,
   format: Format,
@@ -106,6 +107,22 @@ export const ScanOutput = Schema.Struct({
 }).annotate({ identifier: "ScanOutput" })
 
 const MAX_SUGGESTIONS = 4
+/** The note names at most this many left-out cuts. */
+const MAX_NAMED_CUTS = 8
+
+/** Which cuts the budget left off the sheet, and how to see them. */
+const omittedNote = (
+  omitted: ReadonlyArray<Cut>,
+  total: number,
+  strategy: SampleStrategy
+): string | undefined => {
+  if (omitted.length === 0) return undefined
+  const names = omitted.slice(0, MAX_NAMED_CUTS).map((c) => c.marker.name)
+  const more = omitted.length > names.length ? `, and ${omitted.length - names.length} more` : ""
+  const first = omitted[0]!.marker.name
+  const how = strategy === "cuts" ? "pass a larger budget" : "pass sample=cuts or a larger budget"
+  return `${omitted.length} of ${total} cuts not shown: ${names.join(", ")}${more}. To see them, ${how}, or range=@${first}-1f..@${first}+12f for one.`
+}
 
 /** Ranges worth a closer look: around each cut (strongest first), the busiest windows, the top motion peak. */
 const suggest = (range: FrameRange, motion: Motion, cuts: Cuts): Array<typeof Suggestion.Type> => {
@@ -156,7 +173,7 @@ export const scan = define({
     const stats = yield* scanFrames(source, range)
     const detected = detectCuts(stats)
     const { cuts, motion } = yield* saveScanMarkers(timeline.handle, detected, motionEnergy(stats, detected))
-    const picked =
+    const { frames: picked, omittedCuts } =
       input.sample === "motion"
         ? sample({ strategy: "motion", scan: stats, cuts, budget: input.budget })
         : input.sample === "cuts"
@@ -181,6 +198,7 @@ export const scan = define({
           ? `Pass range=${focus} to focus, or a larger budget.`
           : `Pass range=${focus} or sample=motion to focus.`
       ),
+      omittedNote(omittedCuts, cuts.cuts.length, input.sample),
       result.next === null ? undefined : `More sheets follow; pass cursor=${result.next}.`
     ].filter((n) => n !== undefined)
     return {
@@ -190,7 +208,6 @@ export const scan = define({
       sheets: toSheets(result.images, {
         timeline,
         who: timeline.handle,
-        more: result.next !== null,
         format: input.format,
         labelStyle: style
       }),

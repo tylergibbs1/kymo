@@ -10,7 +10,7 @@ export {
   isChanged
 } from "./Difference.ts"
 export { MOTION_TRACK, Motion, MotionPeak, MotionWindow, motionEnergy } from "./Motion.ts"
-export { Budget, type SampleRequest, SampleStrategy, parseBudget, sample } from "./Sampling.ts"
+export { Budget, type Sample, type SampleRequest, SampleStrategy, parseBudget, sample } from "./Sampling.ts"
 export {
   Box,
   LostReason,

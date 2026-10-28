@@ -170,7 +170,7 @@ describe("sampling", () => {
     Effect.gen(function* () {
       const { scan: s, cuts } = yield* analyse(source)
       expect(cuts.cuts.map((c) => c.marker.index)).toEqual([90])
-      const picks = sample({ strategy: "motion", scan: s, cuts, budget }).map((r) => r.index)
+      const picks = sample({ strategy: "motion", scan: s, cuts, budget }).frames.map((r) => r.index)
       expect(picks).toHaveLength(12)
       expect(picks).toContain(0)
       expect(picks).toContain(119)
@@ -178,17 +178,22 @@ describe("sampling", () => {
       const moving = picks.filter((i) => i >= 60).length
       expect(moving).toBeGreaterThan(12 - moving + 3)
       // Deterministic.
-      expect(sample({ strategy: "motion", scan: s, cuts, budget }).map((r) => r.index)).toEqual(picks)
+      expect(sample({ strategy: "motion", scan: s, cuts, budget }).frames.map((r) => r.index)).toEqual(picks)
     })
   )
 
   it.effect("even and cut sampling", () =>
     Effect.gen(function* () {
       const { range, cuts } = yield* analyse(source)
-      const even = sample({ strategy: "even", range, budget: Result.getOrThrow(parseBudget(5)) })
+      const even = sample({ strategy: "even", range, budget: Result.getOrThrow(parseBudget(5)) }).frames
       expect(even.map((r) => r.index)).toEqual([0, 30, 60, 89, 119])
       expect(even[1]!.address).toBe("01s")
-      const atCuts = sample({ strategy: "cuts", range, cuts, budget: Result.getOrThrow(parseBudget(6)) })
+      const atCuts = sample({
+        strategy: "cuts",
+        range,
+        cuts,
+        budget: Result.getOrThrow(parseBudget(6))
+      }).frames
       expect(atCuts.map((r) => r.index)).toEqual([0, 88, 89, 90, 91, 119])
     })
   )
