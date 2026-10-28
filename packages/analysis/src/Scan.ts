@@ -31,6 +31,8 @@ export interface FrameStat {
   readonly histDiff: number | null
   /** The frame at `THUMB_EDGE`, so later passes can compare any two frames' pictures. */
   readonly thumb: Gray
+  /** Mean absolute difference of `thumb` from the previous frame's, 0..1. Null for frame 0. */
+  readonly thumbDiff: number | null
 }
 
 /** One decode pass over a range: everything the pixel analyses need, without the pixels. */
@@ -54,12 +56,13 @@ export const scan = (source: Source, range: FrameRange): Effect.Effect<Scan, Kym
     for (let i = Math.max(0, range.first - 2); i < range.first; i++) lead.push(frameIndex(i))
     const indices = [...lead, ...range.indices()]
     const frames: Array<FrameStat> = []
-    let prev: { gray: Gray; histogram: Float32Array } | undefined
+    let prev: { gray: Gray; histogram: Float32Array; thumb: Gray } | undefined
     let before: Gray | undefined
     return Stream.runForEach(source.readFrames(indices, { maxEdge: SCAN_MAX_EDGE }), (frame) =>
       Effect.sync(() => {
         const gray = toGray(frame.image)
         const h = histogram(gray)
+        const thumb = thumbnail(gray)
         if (frame.index >= range.first) {
           const levels = prev ? diffLevels(prev.gray, gray) : null
           frames.push({
@@ -70,11 +73,12 @@ export const scan = (source: Source, range: FrameRange): Effect.Effect<Scan, Kym
             motion2: before ? meanAbsDiff(before, gray) : null,
             levels,
             histDiff: prev ? histogramDistance(prev.histogram, h) : null,
-            thumb: thumbnail(gray)
+            thumb,
+            thumbDiff: prev ? meanAbsDiff(prev.thumb, thumb) : null
           })
         }
         before = prev?.gray
-        prev = { gray, histogram: h }
+        prev = { gray, histogram: h, thumb }
       })
     ).pipe(Effect.as({ range, frames }))
   })

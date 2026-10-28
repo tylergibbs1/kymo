@@ -70,8 +70,7 @@ interface Found {
 }
 
 /** How much the coarse picture changed from the frame before, per scan position. */
-const coarseChange = (scan: Scan): Array<number> =>
-  scan.frames.map((f, k) => (k === 0 ? 0 : meanAbsDiff(scan.frames[k - 1]!.thumb, f.thumb)))
+const coarseChange = (scan: Scan): Array<number> => scan.frames.map((f) => f.thumbDiff ?? 0)
 
 /** The coarse change a cut must exceed: well above what this clip's ordinary changes do. */
 const coarseFloor = (scan: Scan, coarse: ReadonlyArray<number>): number => {
