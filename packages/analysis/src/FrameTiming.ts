@@ -130,7 +130,7 @@ export const duplicateFrames = (input: PixelInput): Array<Finding> => {
         message:
           count === 1
             ? `${Address.label(range.rate, first)} repeats the frame before it while the picture is moving: a held or duplicated frame.`
-            : `${count} frames from ${Address.label(range.rate, first)} repeat the frame before them while the picture is moving.`,
+            : `${count} frames in a row, ${Address.label(range.rate, first)} to ${Address.label(range.rate, range.first + b)}, each repeats the frame before it while the picture is moving.`,
         view: "diff"
       })
     })
@@ -139,33 +139,62 @@ export const duplicateFrames = (input: PixelInput): Array<Finding> => {
   )
 }
 
+/** Each side of a frame needs this many steadily moving neighbours, and both sides together `2 * STEADY_RADIUS - 1`. */
+const MIN_SIDE = 2
+
+/**
+ * The steadily moving frames either side of `k`, nearest first: up to `STEADY_RADIUS` each side,
+ * stopping where the picture stops moving or a transition begins. A hold right before `k` is stepped
+ * over, so the frame after a hold is judged against the motion around the hold.
+ */
+const steadySides = (
+  k: number,
+  holdBefore: readonly [number, number] | undefined,
+  isSteady: (j: number) => boolean
+): { readonly before: Array<number>; readonly after: Array<number> } => {
+  const side = (from: number, dir: 1 | -1) => {
+    const out: Array<number> = []
+    for (let j = from; out.length < STEADY_RADIUS && isSteady(j); j += dir) out.push(j)
+    return out
+  }
+  return { before: side((holdBefore?.[0] ?? k) - 1, -1), after: side(k + 1, 1) }
+}
+
 /**
  * Frames whose step from the one before looks like two steps of the steady motion around them: a frame
  * between them was skipped. Two steps are measured, not assumed to be twice one (on textured footage the
  * difference saturates), so the test calibrates itself to the clip. Transitions are not motion.
+ *
+ * A frame that lands two steps on right after a held frame is a dropped frame too: the hold showed step
+ * k-1 twice and the next frame shows step k+1, so step k was never shown.
  */
 export const droppedFrames = (input: PixelInput): Array<Finding> => {
   const { range, frames } = input.scan
   const sig = signals(input.scan)
   const { any } = transitions(input)
+  const maxHeld = maxHeldFrames(input.scan)
   const one = (k: number) => frames[k]?.motion ?? null
   const two = (k: number) => frames[k]?.motion2 ?? null
+  const isSteady = (j: number) => sig.moving[j] === true && !any.has(j) && one(j) !== null
+  const holdBefore = new Map<number, readonly [number, number]>()
+  for (const [a, b] of runs(sig.repeat)) if (b - a + 1 <= maxHeld) holdBefore.set(b + 1, [a, b])
   const testable = frames.map(() => false)
   const isEvent = frames.map(() => false)
   const ratios = new Map<number, number>()
   for (let k = 0; k < frames.length; k++) {
     const v = one(k)
-    const around = [-3, -2, -1, 1, 2, 3].map((d) => k + d)
-    if (v === null || [k, ...around].some((j) => any.has(j))) continue
-    if (around.some((j) => !sig.moving[j])) continue
-    const steady = around.map(one).filter((x): x is number => x !== null)
-    if (steady.length < 2 * STEADY_RADIUS) continue
+    if (v === null || any.has(k)) continue
+    const hold = holdBefore.get(k)
+    const { before, after } = steadySides(k, hold, isSteady)
+    if (Math.min(before.length, after.length) < MIN_SIDE) continue
+    if (before.length + after.length < 2 * STEADY_RADIUS - 1) continue
+    const steady = [...before, ...after].map((j) => one(j)!)
     const lo = Math.min(...steady)
     if (Math.max(...steady) > STEADY_SPREAD * lo || lo <= 0) continue
     const step = median(steady)
-    // Two-step differences that do not straddle k: (k-3, k-1), (k-4, k-2), (k, k+2), (k+1, k+3).
-    const twos = [k - 1, k - 2, k + 2, k + 3].map(two).filter((x): x is number => x !== null)
-    if (twos.length < 4) continue
+    // Two-step differences over pairs of steady frames on one side, so none straddles k or a hold.
+    const twos = [...before.slice(0, -1), ...after.slice(1)].map(two).filter((x): x is number => x !== null)
+    if (twos.length < 2 * STEADY_RADIUS - 3) continue
     const twoSteps = median(twos)
     if (twoSteps < MIN_TWO_STEP * step || step < NOISE_MARGIN * sig.repeatNoise) continue
     testable[k] = true
@@ -179,11 +208,27 @@ export const droppedFrames = (input: PixelInput): Array<Finding> => {
     .filter(([k]) => !inCadence.has(k))
     .map(([k, ratio]) => {
       const i = range.first + k
+      const hold = holdBefore.get(k)
+      const motion = `Motion into ${Address.label(range.rate, i)} is ${ratio.toFixed(1)}x its steady neighbours, as big as two steps of their motion`
+      if (hold === undefined)
+        return finding(range, {
+          rule: "dropped-frames",
+          severity: "warning",
+          index: i,
+          message: `${motion}: a frame between ${Address.format(range.rate, i - 1)} and ${Address.format(range.rate, i)} looks dropped.`,
+          view: "diff"
+        })
+      const [a, b] = [range.first + hold[0], range.first + hold[1]]
+      const held =
+        a === b
+          ? Address.label(range.rate, a)
+          : `${Address.label(range.rate, a)} to ${Address.label(range.rate, b)}`
       return finding(range, {
         rule: "dropped-frames",
         severity: "warning",
         index: i,
-        message: `Motion into ${Address.label(range.rate, i)} is ${ratio.toFixed(1)}x its steady neighbours, as big as two steps of their motion: a frame between ${Address.format(range.rate, i - 1)} and ${Address.format(range.rate, i)} looks dropped.`,
+        context: [a, b],
+        message: `${motion}: ${Address.format(range.rate, i)} skips a step after the hold at ${held}, so the frame that should have shown that step was dropped.`,
         view: "diff"
       })
     })
