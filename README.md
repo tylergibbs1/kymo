@@ -12,7 +12,7 @@
   <a href="https://github.com/tylergibbs1/kymo/actions/workflows/ci.yml"><img src="https://github.com/tylergibbs1/kymo/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT license"></a>
   <img src="https://img.shields.io/badge/node-24-339933.svg" alt="Node 24">
-  <img src="https://img.shields.io/badge/MCP-2025--11--25%20%7C%202026--07--28-6f42c1.svg" alt="MCP 2025-11-25 and 2026-07-28">
+  <img src="https://img.shields.io/badge/MCP-2024--11--05%20to%202026--07--28-6f42c1.svg" alt="MCP 2024-11-05 to 2026-07-28">
   <a href="https://github.com/tylergibbs1/kymo/commits/main"><img src="https://img.shields.io/github/last-commit/tylergibbs1/kymo.svg" alt="Last commit"></a>
 </p>
 
@@ -50,6 +50,7 @@ Then `track` measures it: the ball first touches the wall at `20f #20`, and `che
 | Write            | Means                                |
 | ---------------- | ------------------------------------ |
 | `08s10f`         | 8 seconds and 10 frames (canonical)  |
+| `02m00s24f`      | 2 minutes, 0 seconds and 24 frames   |
 | `#250`           | frame index 250                      |
 | `8.33s`, `500ms` | a time, rounded to the nearest frame |
 | `-1f`            | the last frame                       |
@@ -57,17 +58,20 @@ Then `track` measures it: the ball first touches the wall at `20f #20`, and `che
 | `2s..4s:2f`      | a range, every second frame          |
 | `clip1@08s10f`   | an address on a named source         |
 
+On variable-frame-rate footage and GIFs, seconds are real time and frames are decoded frames: `16s` is the frame on screen at 16 s, `-1f` the last frame, and labels show each frame's own start time (`16.04s #350`), so a label never disagrees with `t`.
+
 ## Features
 
 - 🎞️ **Contact sheets sized for the model.** Up to 12 labelled frames per image, sized to `high-res` (≤2576 px, ≤4784 visual tokens) or `standard` (≤1568 px, ≤1568 tokens), so cost is known before rendering. Frames are never upscaled, labels sit under the frame and are at least 28 px tall.
-- 🧅 **Views that show motion between frames.** `onion` blends frames into one cell to show path and spacing, `diff` heatmaps what changed, `follow` crops a region over time, `compare` puts two sources side by side at the same addresses, `plot` charts numeric tracks.
+- 🧅 **Views that show motion between frames.** `onion` blends frames into one cell to show path and spacing, `diff` heatmaps what changed, `follow` crops a region over time, `compare` puts two sources side by side at the same moments (matched by time when their frame rates differ), `plot` charts numeric tracks.
 - 📈 **Numbers, not guesses.** `track` follows a box and returns `x`, `y`, `w`, `h` per frame, then fits the easing (`linear`, CSS presets, `cubic-bezier(...)`, or a spring with stiffness and damping). Synthetic sources return exact ground-truth tracks.
 - ✂️ **Finds what changes.** `scan` measures motion energy, finds hard cuts and fades, and spends its frame budget where things move. Cuts and peaks become markers you can address, like `@cut1`.
 - 🔍 **Lint rules and assertions.** `check` finds duplicated, dropped and black frames, flicker, things leaving the safe area, and curves that reverse. Assertions read like the question:
   ```sh
   kymo check clip1 --assert "box.x <= 600 at 1s" --assert "@impact1 within #18..#22"
   ```
-- 🤝 **Agent-friendly contract.** stdout carries only JSON. Errors are typed with a hint that says how to fix them (`"8s10" is not an address. Use 08s10f, #250, 8.33s…`). Flags are only ever added, and `kymo schema` prints every input and output JSON Schema.
+- 🤝 **Agent-friendly contract.** stdout carries only JSON: `open`, `probe`, `scan`, `track`, `record` and `schema` print one JSON value; `frames`, `compare` and `check` print JSON Lines, one sheet or finding per line and then a summary line (`kymo schema <command>` describes both under `lines`). Errors go to stderr as `{tag, message, hint}`, with a hint that says how to fix them (`"8s10" is not an address. Use 08s10f, #250, 8.33s…`). Exit codes: 0 done, 1 a `check` that did not pass (its result is still printed), 2 bad input, 3 source not found, 4 adapter unavailable, 5 timeout, 6 backend failure. Flags are only ever added, and `kymo schema` prints every input and output JSON Schema.
+- 🖼️ **Images an API accepts.** Every image stays under 3.75 MB (5 MB as base64); a sheet of noisy footage is re-encoded with a palette, then scaled down, until it fits. A custom target can set its own `maxBytes`.
 - 🧪 **An eval decides the design.** 42 tasks with ground truth, an agent loop for Claude, and A/B experiments for sheet size, cells per sheet, label style, sampling, tool examples and text format. [Read more](eval/README.md).
 
 ## Quick start

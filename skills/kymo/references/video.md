@@ -4,21 +4,30 @@
 
 | Source                       | Example                     | Clock                                   |
 | ---------------------------- | --------------------------- | --------------------------------------- |
-| Video file (mp4, mov, webm…) | `clip.mp4`                  | The container's frame rate              |
+| Video file (mp4, mov, ogg…)  | `clip.mp4`                  | The container's frame rate              |
 | Directory of numbered frames | `frames/`, `frames/?fps=24` | 30 fps unless `?fps=` says otherwise    |
 | Animated GIF or WebP         | `loader.gif`                | The file's own frame delays, or `?fps=` |
 
-Rates can be exact: `?fps=29.97` and `?fps=30000/1001` are the same rate. Directories hold PNG or JPG frames, played in name order (`frame_001.png`, `frame_002.png`, …).
+Rates can be exact: `?fps=29.97` and `?fps=30000/1001` are the same rate. Directories hold PNG or JPG frames, played in name order (`frame_001.png`, `frame_002.png`, …). Video files are anything ffmpeg reads with one of the usual extensions: mp4, mov, m4v, webm, mkv, ogg/ogv, avi, flv, wmv/asf, mpg/mpeg, ts/mts/m2ts, 3gp, mxf, y4m.
 
 Video needs `ffmpeg` and `ffprobe` on `PATH`, or `KYMO_FFMPEG` and `KYMO_FFPROBE` set to the binaries. Without them, video calls fail with `AdapterUnavailable` and an install hint; image sequences and synthetic sources still work.
 
 ## Handles
 
-The first call on a path gives it a handle (`clip1`, `clip2`, …), remembered in `.kymo/handles.json` under the current directory. Pass the handle afterwards instead of the path. `kymo open clip.mp4 --as hero` or `kymo probe clip.mp4 --as hero` picks the name yourself.
+The first call on a path gives it a handle (`clip1`, `clip2`, …), remembered in `.kymo/handles.json` under the current directory. Pass the handle afterwards instead of the path. `kymo open clip.mp4 --as hero` or `kymo probe clip.mp4 --as hero` picks the name yourself. A name that already belongs to another source is refused, so its markers are never lost by accident; pass `--replace` to rebind it on purpose (its markers are dropped). Naming the same source again changes nothing.
 
 ## Variable frame rate
 
-Phone and screen recordings are often variable frame rate. `probe` reports `vfr: true`, the average rate as `fps` and the real duration. Addresses still name decoded frames in order, so on VFR footage `#index` is the exact form; timecodes are approximate.
+Phone and screen recordings are often variable frame rate, and animated GIFs and WebPs with uneven frame delays are too. `probe` reports `vfr: true`, the average rate as `fps`, and the real length as `durationSeconds` and `duration` (`32.48s`). On these sources seconds are real time and frames are decoded frames:
+
+| Write                  | Means on a VFR source                                           |
+| ---------------------- | --------------------------------------------------------------- |
+| `16s`, `8.33s`, `-2s`  | the frame on screen at that time (counted from the end for `-`) |
+| `5f`, `-1f`, `#350`    | decoded frames: the sixth, the last, index 350                  |
+| `@cut1+5f`, `@cut1+1s` | five decoded frames after the marker; the frame 1 s after it    |
+| `2s..4s:2f`, `:0.5s`   | every second decoded frame; one frame per half second           |
+
+Labels, file names and `address` fields show each frame's own start time (`16.04s #350`), the same number as its `t`, so what you read is what you can pass back. `t` is the frame's presentation time; for a GIF, the start of its delay.
 
 ## Workflow
 
