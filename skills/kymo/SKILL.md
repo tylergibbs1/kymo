@@ -23,15 +23,18 @@ Labels show both forms: `08s10f #250`. Quote either back.
 
 ## The loop
 
-1. **probe** the source: fps, duration, size, tracks, markers. Cheap, no images.
-2. **scan** with a small budget (6–12) for an overview. Use `sample=motion` to spend frames where things change; cuts are always included. Read the motion-energy summary and the suggested next ranges. Scan saves what it finds as markers on the source (`@cut1`, `@peak1`), so later calls can address them.
+1. **probe** the source: fps, duration, size, tracks, markers. Cheap, no images. `as=hero` names it.
+2. **scan** with a small budget (6–12) for an overview. Use `sample=motion` to spend frames where things change; cuts are always included. Read the motion-energy summary and the suggested next ranges. Scan saves what it finds as markers on the source (`@cut1`, `@peak1`), so later calls can address them. A cut's `incoming` is the first frame showing the new shot (for a fade, the first mixed frame); its `address` is the middle of a fade.
 3. **frames** at the interesting addresses. Pick the view for the question:
    - `sheet`: what happens at these moments
    - `onion`: path and spacing of a motion (easing, arcs)
    - `diff`: what changed between consecutive frames, and where
    - `follow`: one region up close over time
    - `grid`: rough on-screen position (orientation only; never read coordinates off pixels when a track exists)
-4. **track** or **check** for numbers. Prefer measured numbers over estimates from pixels: `track` returns positions per frame and an easing fit; `check` runs lint rules (flicker, dropped/duplicate frames, black frames, safe area, non-monotonic curves) and assertions such as `box.x <= 600 at 1s` or `@impact1 within #40..#50`.
+4. **track** or **check** for numbers. Prefer measured numbers over estimates from pixels:
+   - `track` returns keyframes (where a value starts, stops and reverses, at exact frames) and an optional easing fit; pass `format=detailed` for every frame. A `box` must be where the subject is at the **first frame of the range**; `lost` lists frames where it was lost (`low-confidence`, or `edge` when it ran off the frame).
+   - `check` runs lint rules (flicker, dropped/duplicate frames, black frames, safe area, non-monotonic curves) and assertions such as `box.x <= 600 at 1s` or `@impact1 within #40..#50`. On footage, pass `box` the same way to check the safe area and assert on `box.x`/`.y`/`.w`/`.h`: `kymo check clip1 --box 120,80,64,64 --rules safe-area --assert "box.x <= 554 at #60"`. `safeMargin` is 0.05 (action-safe) by default; use 0.1 for title-safe.
+   - `pass` is false only for errors and failed assertions; read `counts` (or `label`, e.g. "Pass with 2 warnings, 0 errors, 0 info; …") for warnings too.
 5. Change the source (edit the animation, re-export the video).
 6. **compare** before and after at the same addresses (`view=side` or `view=diff`), and rerun the same `check --assert` to prove the change.
 
@@ -40,6 +43,7 @@ Labels show both forms: `08s10f #250`. Quote either back.
 - Sheets are sized for the model reading them: `target=high-res` (default, ≤2576 px, ≤4784 visual tokens) or `target=standard` (≤1568 px, ≤1568 tokens) for older tiers.
 - A call returns at most 4 sheets; continue with the `next` cursor.
 - Requests above 100 frames are refused; narrow the range, add a step, or use `sample=motion`.
+- On the CLI, `frames`, `compare` and `check` print JSON Lines: one sheet or finding per line, then a summary line. `kymo schema check` describes both under `lines`.
 - Results include file paths (CLI) or `kymo://` resource links (MCP). In long sessions, pass `images=links` to get links without image data, and reopen a file instead of asking for the same frames again.
 
 ## Errors

@@ -21,7 +21,7 @@ Every scene has the tracks `box.x`, `box.y`, `box.w`, `box.h` (px) and `box.opac
 kymo track "synthetic:ease?easing=ease-out" --props box.x --fit-easing
 kymo frames "synthetic:bounce?impact=20" --at @impact1-2f..@impact1+2f --view onion
 kymo check "synthetic:flicker?at=40" --rules flicker
-kymo check synthetic:safe-area --rules safe-area
+kymo check synthetic:safe-area --rules safe-area --safe-margin 0.1   # the scene's margin is 10%
 kymo scan "synthetic:cut?at=45&fade=10" --sample cuts
 kymo check "synthetic:dropped?dups=20,50" --rules duplicate-frames
 ```
