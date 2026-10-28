@@ -1,11 +1,11 @@
 import { describe, expect, it } from "@effect/vitest"
-import { type Operation, check, execute, kymoLayer } from "kymo"
+import { type Operation, check, execute, kymoLayer, scan } from "kymo"
 import { Effect, Layer, Schema } from "effect"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterAll, beforeAll } from "vitest"
-import { type Footage, footage } from "./footage.ts"
+import { type Footage, dissolve, footage } from "./footage.ts"
 
 const fresh = Layer.unwrap(
   Effect.map(
@@ -33,6 +33,25 @@ const timing = (source: string) =>
       out.findings.map((f) => ({ rule: f.rule, severity: f.severity, index: f.index, message: f.message }))
     )
   )
+
+const cutsOf = (source: string) =>
+  call(scan, { source, budget: 4 }).pipe(Effect.map((out) => out.cuts.map((c) => c.kind)))
+
+describe("cuts in encoded footage", () => {
+  it.effect("finds a one-second cross-dissolve as one fade", () =>
+    Effect.gen(function* () {
+      const source = dissolve(clips, "dissolve-24", { fps: 24, offset: 2, seconds: 1 })
+      expect(yield* cutsOf(source)).toEqual(["fade"])
+    }).pipe(Effect.provide(fresh))
+  )
+
+  it.effect("finds the dissolve as one fade at 60 fps too, not a run of hard cuts", () =>
+    Effect.gen(function* () {
+      const source = dissolve(clips, "dissolve-60", { fps: 24, offset: 2, seconds: 1, then: ["fps=60"] })
+      expect(yield* cutsOf(source)).toEqual(["fade"])
+    }).pipe(Effect.provide(fresh))
+  )
+})
 
 describe("frame timing on encoded footage", () => {
   it.effect(
@@ -84,6 +103,14 @@ describe("frame timing on encoded footage", () => {
       expect(found).toHaveLength(1)
       expect(found[0]).toMatchObject({ rule: "duplicate-frames", severity: "info" })
       expect(found[0]!.message).toContain("held on twos")
+    }).pipe(Effect.provide(fresh))
+  )
+
+  it.effect("a cross-dissolve is a transition, not a dropped frame", () =>
+    Effect.gen(function* () {
+      const source = dissolve(clips, "dissolve-check", { fps: 24, offset: 2, seconds: 1 })
+      const found = yield* timing(source)
+      expect(found.filter((f) => f.rule === "dropped-frames")).toEqual([])
     }).pipe(Effect.provide(fresh))
   )
 
