@@ -59,6 +59,25 @@ export default tseslint.config(
     }
   },
   {
+    // Whole-frame motion depends on how much of the frame moves: a small element in a large still page
+    // never reaches a floor tuned on full-frame footage. Pixel rules compare with the clip's own
+    // statistics (packages/analysis/src/Signals.ts), never with a fixed number.
+    files: ["packages/analysis/src/**/*.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        noConsoleLog,
+        spawnThroughRun,
+        {
+          selector:
+            "BinaryExpression[operator=/^[<>]=?$/]:matches([left.property.name=/^motion2?$/][right.raw=/^(?!0$)[0-9.]+$/], [right.property.name=/^motion2?$/][left.raw=/^(?!0$)[0-9.]+$/])",
+          message:
+            "Whole-frame motion is not comparable across clips. Compare with the clip's own statistics (Signals.ts), not a fixed number."
+        }
+      ]
+    }
+  },
+  {
     files: ["packages/kymo/src/**/*.ts"],
     plugins: { kymo: { rules: { "schema-field-descriptions": schemaFieldDescriptions } } },
     rules: { "kymo/schema-field-descriptions": "error" }

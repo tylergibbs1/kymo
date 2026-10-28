@@ -2,6 +2,7 @@ import { FrameRef, Marker, Track, fpsOf } from "@kymo/core"
 import { Schema } from "effect"
 import type { Cuts } from "./Cuts.ts"
 import type { Scan } from "./Scan.ts"
+import { signals } from "./Signals.ts"
 import { mean, round, std, summarize } from "./Stats.ts"
 
 export const MOTION_TRACK = "motion"
@@ -27,7 +28,7 @@ export const Motion = Schema.Struct({
   mean: Schema.Number,
   max: Schema.Number,
   maxAt: FrameRef,
-  /** Fraction of frames whose energy is below the stillness floor. */
+  /** Fraction of frames where nothing visibly moved: a few pixels at most changed beyond the clip's noise. */
   stillRatio: Schema.Number,
   /** Strongest first: `peak1` is the biggest motion peak. Cut frames are not peaks. */
   peaks: Schema.Array(MotionPeak),
@@ -36,7 +37,6 @@ export const Motion = Schema.Struct({
 })
 export type Motion = typeof Motion.Type
 
-export const STILL_FLOOR = 0.002
 const MAX_PEAKS = 5
 const MAX_WINDOWS = 3
 
@@ -59,12 +59,16 @@ const knownShotEnergy = (scan: Scan, cuts: Cuts): Array<number | null> => {
 export const shotEnergy = (scan: Scan, cuts: Cuts): Array<number> =>
   knownShotEnergy(scan, cuts).map((v) => v ?? 0)
 
-const findPeaks = (energy: ReadonlyArray<number>, separation: number): Array<number> => {
-  const floor = Math.max(STILL_FLOOR, mean(energy) + std(energy))
+const findPeaks = (
+  energy: ReadonlyArray<number>,
+  moving: ReadonlyArray<boolean>,
+  separation: number
+): Array<number> => {
+  const floor = mean(energy) + std(energy)
   const candidates: Array<number> = []
   for (let k = 0; k < energy.length; k++) {
     const v = energy[k]!
-    if (v <= floor) continue
+    if (v <= floor || !moving[k]) continue
     let isMax = true
     for (let j = Math.max(0, k - separation); j <= Math.min(energy.length - 1, k + separation); j++) {
       // Ties go to the earliest frame, so a plateau yields one peak.
@@ -102,8 +106,9 @@ export const motionEnergy = (scan: Scan, cuts: Cuts): Motion => {
   const known = knownShotEnergy(scan, cuts)
   const energy = known.map((v) => v ?? 0)
   const summary = summarize(known)
-  const still = known.filter((v) => v !== null && v < STILL_FLOOR).length
-  const peaks = findPeaks(energy, Math.max(2, Math.round(fps / 4)))
+  const { moving } = signals(scan)
+  const still = known.filter((v, k) => v !== null && !moving[k]).length
+  const peaks = findPeaks(energy, moving, Math.max(2, Math.round(fps / 4)))
   const windowLength = Math.max(1, Math.min(energy.length, Math.round(fps)))
   return {
     track: { name: MOTION_TRACK, unit: "0..1", samples },
