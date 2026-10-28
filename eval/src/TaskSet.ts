@@ -41,7 +41,8 @@ export class TaskFileInvalid extends Schema.TaggedError<TaskFileInvalid>()("Task
   message: Schema.String
 }) {}
 
-const readJson = <A>(path: string, schema: Schema.Codec<A, unknown>) =>
+/** Read and decode a JSON file; any failure names the file. */
+export const readJson = <A>(path: string, schema: Schema.Codec<A, unknown>) =>
   Effect.try({
     try: () => JSON.parse(readFileSync(path, "utf8")) as unknown,
     catch: (cause) =>

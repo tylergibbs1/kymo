@@ -23,7 +23,7 @@ export interface RunConfig {
   readonly system: string
   readonly maxCalls: number
   readonly concurrency: number
-  /** Where synthetic renderings are cached between runs. */
+  /** The eval cache root: synthetic renderings and UI footage live under it. */
   readonly cacheDir: string
   /** This run's report directory, e.g. eval/reports/runs/2026-10-28T14-00-00Z. */
   readonly outDir: string

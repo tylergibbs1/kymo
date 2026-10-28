@@ -1,0 +1,65 @@
+<!doctype html>
+<!--
+  A box steps right by a fixed amount each frame, like a JS-driven animation on a busy main thread.
+  start: last frame before it moves. steps: how many steps to its end. step: px per step. x0, y, size, color.
+  dups: frames that repeat the previous frame (a late timer). skips: frames that advance two steps (a
+  dropped frame). spinner: 1 adds a turning spinner, so no frame of the page is an exact repeat.
+-->
+<html>
+  <head>
+    <link rel="stylesheet" href="common.css" />
+    <script src="scene.js"></script>
+    <style>
+      #box {
+        position: absolute;
+        left: 0;
+        border-radius: 10px;
+      }
+      #box .s {
+        position: absolute;
+        left: 25%;
+        top: 25%;
+        width: 50%;
+        height: 50%;
+        background: #f2a33a;
+        border-radius: 50%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="box"><div class="s"></div></div>
+    <script>
+      const { num, str, list, define, spinner, backdrop } = Scene
+      backdrop()
+      const frames = num("frames", 90)
+      const start = num("start", 5)
+      const steps = num("steps", 70)
+      const step = num("step", 8)
+      const x0 = num("x0", 100)
+      const size = num("size", 80)
+      const dups = new Set(list("dups"))
+      const skips = new Set(list("skips"))
+      const el = document.getElementById("box")
+      Object.assign(el.style, {
+        top: `${num("y", 320)}px`,
+        width: `${size}px`,
+        height: `${size}px`,
+        background: str("color", "#2b59c3")
+      })
+      const at = [0]
+      for (let i = 1; i < frames; i++) {
+        const prev = at[i - 1]
+        const inc = i <= start || prev >= steps ? 0 : dups.has(i) ? 0 : skips.has(i) ? 2 : 1
+        at.push(Math.min(steps, prev + inc))
+      }
+      if (num("spinner", 0)) spinner(1100, 90)
+      define({
+        frames,
+        elements: { box: el },
+        render: (i) => {
+          el.style.transform = `translateX(${x0 + step * at[i]}px)`
+        }
+      })
+    </script>
+  </body>
+</html>

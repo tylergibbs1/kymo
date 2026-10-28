@@ -1,0 +1,87 @@
+<!doctype html>
+<!--
+  A toast slides in from off-screen and stays.
+  from: right (top-right corner) or bottom (bottom centre). dur, delay: ms. ease: CSS easing.
+  w, h, color: the toast. pulse: ms at which a button elsewhere pulses (0 = never).
+-->
+<html>
+  <head>
+    <link rel="stylesheet" href="common.css" />
+    <script src="scene.js"></script>
+    <style>
+      #toast {
+        position: absolute;
+        border-radius: 10px;
+        color: #fff;
+        box-sizing: border-box;
+        padding: 14px 18px 0 64px;
+        font-size: 17px;
+        overflow: hidden;
+      }
+      #toast .ok {
+        position: absolute;
+        left: 16px;
+        top: 16px;
+        width: 32px;
+        height: 32px;
+        border-radius: 16px;
+        background: #36c27a;
+      }
+      #btn {
+        position: absolute;
+        left: 540px;
+        top: 400px;
+        width: 200px;
+        height: 60px;
+        background: #e8573f;
+        border-radius: 10px;
+        color: #fff;
+        text-align: center;
+        line-height: 60px;
+        font-size: 22px;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="btn">Publish</div>
+    <div id="toast">
+      <div class="ok"></div>
+      Saved changes
+    </div>
+    <script>
+      const { num, str, define, backdrop } = Scene
+      backdrop()
+      const w = num("w", 340)
+      const h = num("h", 64)
+      const from = str("from", "right")
+      const el = document.getElementById("toast")
+      const x = from === "right" ? 1280 - 24 - w : Math.round((1280 - w) / 2)
+      const y = from === "right" ? 80 : 720 - 32 - h
+      Object.assign(el.style, {
+        left: `${x}px`,
+        top: `${y}px`,
+        width: `${w}px`,
+        height: `${h}px`,
+        background: str("color", "#13203d")
+      })
+      const offscreen = from === "right" ? `translateX(${w + 40}px)` : `translateY(${h + 48}px)`
+      el.animate([{ transform: offscreen }, { transform: "translate(0px, 0px)" }], {
+        duration: num("dur", 400),
+        delay: num("delay", 200),
+        easing: str("ease", "ease-out"),
+        fill: "both"
+      })
+      const pulse = num("pulse", 0)
+      if (pulse > 0)
+        document
+          .getElementById("btn")
+          .animate([{ transform: "scale(1)" }, { transform: "scale(1.06)" }, { transform: "scale(1)" }], {
+            duration: 300,
+            delay: pulse,
+            fill: "both"
+          })
+      define({ frames: 60, elements: { toast: el } })
+    </script>
+  </body>
+</html>

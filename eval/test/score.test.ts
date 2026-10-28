@@ -66,4 +66,11 @@ describe("score: labels and counts", () => {
     assert.isFalse(score(count, at30, "ANSWER: 5").pass)
     assert.include(score(count, at30, "ANSWER: four").problem, "whole number")
   })
+  it("matches signed frame differences within tolerance, with or without a unit", () => {
+    const delta: Answer = { _tag: "delta", value: -6, tolerance: 2 }
+    assert.deepInclude(score(delta, at30, "ANSWER: -6"), { pass: true, frameError: 0 })
+    assert.deepInclude(score(delta, at30, "ANSWER: −8 frames"), { pass: true, frameError: 2 })
+    assert.deepInclude(score(delta, at30, "ANSWER: 6f"), { pass: false, frameError: 12 })
+    assert.include(score(delta, at30, "ANSWER: about six").problem, "signed whole number")
+  })
 })

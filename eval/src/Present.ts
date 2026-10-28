@@ -1,7 +1,8 @@
 /**
  * What source string the model is handed. A synthetic spec names its own answer (`flicker?at=45`)
  * and opens with `truth` markers, so it is rendered once to a directory of PNGs under an
- * opaque name and the model gets that: pixels only, no parameters, no markers.
+ * opaque name and the model gets that: pixels only, no parameters, no markers. A UI task's source
+ * (`ui:<key>`) names a browser capture, cached as an mp4 under the same opaque key.
  */
 import { createHash } from "node:crypto"
 import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs"
@@ -11,15 +12,19 @@ import { Sources, SyntheticAdapter } from "@kymo/sources"
 import { Effect, Layer, Stream } from "effect"
 import sharp from "sharp"
 import type { Task } from "./Task.ts"
+import { footagePath } from "./ui/Truth.ts"
+
+/** The task source of a browser capture: `ui:<key>`. */
+export const UI_SOURCE_PREFIX = "ui:"
 
 const SyntheticSources = Sources.layerFrom(SyntheticAdapter).pipe(Layer.provide(SyntheticAdapter.layer))
 
 const rateParam = (task: Task) =>
   task.clock.rate.den === 1 ? String(task.clock.rate.num) : `${task.clock.rate.num}/${task.clock.rate.den}`
 
-/** Render a synthetic spec to `<cacheDir>/<hash>/NNNNN.png`. Reuses a complete earlier rendering. */
+/** Render a synthetic spec to `<cacheDir>/frames/<hash>/NNNNN.png`. Reuses a complete earlier rendering. */
 export const renderFrames = (spec: string, cacheDir: string): Effect.Effect<string, KymoError> => {
-  const dir = join(cacheDir, createHash("sha256").update(spec).digest("hex").slice(0, 16))
+  const dir = join(cacheDir, "frames", createHash("sha256").update(spec).digest("hex").slice(0, 16))
   if (existsSync(join(dir, ".complete"))) return Effect.succeed(dir)
   const partial = `${dir}.partial-${process.pid}`
   return Effect.gen(function* () {
@@ -44,8 +49,20 @@ export const renderFrames = (spec: string, cacheDir: string): Effect.Effect<stri
   }).pipe(Effect.scoped, Effect.provide(SyntheticSources))
 }
 
-/** The source string the model gets for a task. Non-synthetic sources pass through unchanged. */
-export const present = (task: Task, cacheDir: string): Effect.Effect<string, KymoError> =>
-  !task.source.startsWith("synthetic:")
+/** Where a UI task's footage is cached; undefined for every other task. */
+export const uiFootage = (task: Task, cacheDir: string): string | undefined =>
+  task.source.startsWith(UI_SOURCE_PREFIX)
+    ? footagePath(cacheDir, task.source.slice(UI_SOURCE_PREFIX.length))
+    : undefined
+
+/**
+ * The source string the model gets for a task, given the eval cache root. Clip paths pass through
+ * unchanged.
+ */
+export const present = (task: Task, cacheDir: string): Effect.Effect<string, KymoError> => {
+  const footage = uiFootage(task, cacheDir)
+  if (footage !== undefined) return Effect.succeed(footage)
+  return !task.source.startsWith("synthetic:")
     ? Effect.succeed(task.source)
     : Effect.map(renderFrames(task.source, cacheDir), (dir) => `${dir}?fps=${rateParam(task)}`)
+}

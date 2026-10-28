@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Effect } from "effect"
@@ -7,7 +7,8 @@ import { exportQuestions, scoreAnswers, summarize } from "../src/External.ts"
 import { loadTaskFile } from "../src/TaskSet.ts"
 
 const TASKS = join(import.meta.dirname, "../tasks/synthetic.json")
-const CACHE = join(import.meta.dirname, "../.cache/frames")
+const UI_TASKS = join(import.meta.dirname, "../tasks/ui.json")
+const CACHE = join(import.meta.dirname, "../.cache")
 
 describe("external agents", () => {
   it.effect("export hides the answer and scoring reads replies like the loop does", () =>
@@ -40,6 +41,27 @@ describe("external agents", () => {
         ]
       )
       assert.include(summarize(results, "t"), "Overall 1/2")
+    })
+  )
+
+  it.effect("exports UI footage as an .mp4 link that names neither the task nor the capture", () =>
+    Effect.gen(function* () {
+      const task = (yield* loadTaskFile(UI_TASKS))[0]!
+      const root = mkdtempSync(join(tmpdir(), "kymo-external-ui-"))
+      const key = task.source.replace(/^ui:/, "")
+      mkdirSync(join(root, "cache", "ui", key), { recursive: true })
+      writeFileSync(join(root, "cache", "ui", key, "clip.mp4"), "")
+      const out = join(root, "questions")
+      yield* exportQuestions({
+        tasks: [task],
+        cacheDir: join(root, "cache"),
+        questionsDir: out,
+        keyDir: join(root, "key")
+      })
+      assert.deepStrictEqual(readdirSync(join(out, "clips")), ["q01.mp4"])
+      const exported = readFileSync(join(out, "questions.json"), "utf8")
+      assert.notInclude(exported, task.id)
+      assert.notInclude(exported, key)
     })
   )
 })

@@ -1,0 +1,103 @@
+<!doctype html>
+<!--
+  Two things move at once: a badge drifting at constant speed, and a progress bar filling.
+  Badge: bx, by (its box at 0f), bw, bh, speed (px per frame, negative moves left), vy (px per frame down).
+  Progress: py (top of the bar), pdur (frames to fill), rev (frame it starts going backwards, -1 = never),
+  revLen (frames it goes backwards), revRate (px per frame backwards).
+-->
+<html>
+  <head>
+    <link rel="stylesheet" href="common.css" />
+    <script src="scene.js"></script>
+    <style>
+      #badge {
+        position: absolute;
+        left: 0;
+        top: 0;
+        background: #36c27a;
+        color: #fff;
+        font-weight: bold;
+        font-size: 18px;
+        text-align: center;
+        overflow: hidden;
+      }
+      #track,
+      #fill {
+        position: absolute;
+        left: 240px;
+        height: 16px;
+        border-radius: 8px;
+      }
+      #track {
+        width: 800px;
+        background: #d5dae3;
+      }
+      #fill {
+        width: 0;
+        background: #2b59c3;
+      }
+      #knob {
+        position: absolute;
+        left: 0;
+        width: 40px;
+        height: 40px;
+        background: #fff;
+        border: 4px solid #2b59c3;
+        border-radius: 20px;
+        box-sizing: border-box;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="badge">NEW</div>
+    <div id="track"></div>
+    <div id="fill"></div>
+    <div id="knob"></div>
+    <script>
+      const { num, define, backdrop } = Scene
+      backdrop()
+      const frames = num("frames", 100)
+      const bx = num("bx", 200)
+      const by = num("by", 200)
+      const bw = num("bw", 160)
+      const bh = num("bh", 60)
+      const speed = num("speed", 16)
+      const vy = num("vy", 0)
+      const badge = document.getElementById("badge")
+      Object.assign(badge.style, {
+        width: `${bw}px`,
+        height: `${bh}px`,
+        lineHeight: `${bh}px`,
+        borderRadius: `${Math.min(bw, bh) / 2}px`
+      })
+
+      const py = num("py", 460)
+      const pdur = num("pdur", 89)
+      const rev = num("rev", 50)
+      const revLen = num("revLen", 6)
+      const revRate = num("revRate", 15)
+      const fill = document.getElementById("fill")
+      const knob = document.getElementById("knob")
+      document.getElementById("track").style.top = `${py}px`
+      fill.style.top = `${py}px`
+      knob.style.top = `${py - 12}px`
+      // Fill width per frame: steady progress, a backwards stretch, then steady again to the end.
+      const width = [0]
+      for (let i = 1; i < frames; i++) {
+        const prev = width[i - 1]
+        const back = rev >= 0 && i >= rev && i < rev + revLen
+        const left = Math.max(1, pdur - i + 1)
+        width.push(back ? Math.max(0, prev - revRate) : Math.min(800, prev + (800 - prev) / left))
+      }
+      define({
+        frames,
+        elements: { badge, knob },
+        render: (i) => {
+          badge.style.transform = `translate(${bx + speed * i}px, ${by + vy * i}px)`
+          fill.style.width = `${width[i]}px`
+          knob.style.transform = `translateX(${240 + width[i] - 20}px)`
+        }
+      })
+    </script>
+  </body>
+</html>

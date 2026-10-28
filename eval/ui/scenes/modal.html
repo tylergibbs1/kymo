@@ -1,0 +1,84 @@
+<!doctype html>
+<!--
+  A dialog (or popover, or tooltip) animates in with the Web Animations API.
+  dur, delay: ms. ease: any CSS easing. dist: px it rises from (0 = no movement). fade: 1 fades in from 0.
+  w, h, x, y: its box at rest (x, y default to centred). color: accent.
+  scrim: ms for a dimming scrim to fade in from delay (0 = none). spinner: 1 adds a turning spinner.
+-->
+<html>
+  <head>
+    <link rel="stylesheet" href="common.css" />
+    <script src="scene.js"></script>
+    <style>
+      #scrim {
+        position: absolute;
+        inset: 0;
+        background: #000;
+        opacity: 0;
+      }
+      #dialog .btn {
+        position: absolute;
+        right: 24px;
+        bottom: 20px;
+        width: 110px;
+        height: 40px;
+        border-radius: 8px;
+        color: #fff;
+        text-align: center;
+        line-height: 40px;
+        font-weight: bold;
+      }
+      #dialog.small {
+        color: #fff;
+        font-size: 14px;
+        line-height: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="scrim"></div>
+    <div id="dialog" class="panel"></div>
+    <script>
+      const { num, str, define, spinner, backdrop } = Scene
+      backdrop()
+      const w = num("w", 480)
+      const h = num("h", 280)
+      const x = num("x", Math.round((1280 - w) / 2))
+      const y = num("y", Math.round((720 - h) / 2))
+      const color = str("color", "#2b59c3")
+      const dur = num("dur", 300)
+      const delay = num("delay", 200)
+      const ease = str("ease", "ease-out")
+      const dist = num("dist", 80)
+      const fade = num("fade", 1)
+      const scrimMs = num("scrim", 0)
+      const el = document.getElementById("dialog")
+      Object.assign(el.style, { left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${h}px` })
+      if (h < 100) {
+        el.classList.add("small")
+        el.style.background = color
+        el.textContent = "Copied to clipboard"
+      } else {
+        el.style.boxShadow = `0 0 0 2px ${color}`
+        el.innerHTML = `<h2>Delete project?</h2><p>This removes 14 files and cannot be undone.</p><div class="btn" style="background:${color}">Delete</div>`
+      }
+      el.animate(
+        [
+          { transform: `translateY(${dist}px)`, opacity: fade ? 0 : 1 },
+          { transform: "translateY(0px)", opacity: 1 }
+        ],
+        { duration: dur, delay, easing: ease, fill: "both" }
+      )
+      if (scrimMs > 0)
+        document
+          .getElementById("scrim")
+          .animate([{ opacity: 0 }, { opacity: 0.35 }], { duration: scrimMs, delay, fill: "both" })
+      if (num("spinner", 0)) spinner(1100, 90)
+      define({ frames: 60, elements: { dialog: el } })
+    </script>
+  </body>
+</html>

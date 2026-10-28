@@ -1,0 +1,2521 @@
+{
+  "tasks": [
+    {
+      "id": "ui-modal-300-out-start",
+      "split": "dev",
+      "source": "ui:0c13e94e8042850f",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-start",
+        "element": "dialog",
+        "subject": {
+          "box": {
+            "x": 400,
+            "y": 220,
+            "w": 480,
+            "h": 280
+          },
+          "seen": "at-rest"
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A dialog animates in. Once it has finished animating, the dialog occupies the box x=400, y=220, w=480, h=280 (pixels). At which frame does the dialog first visibly change (move or fade)?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 13,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-modal-300-out-settle",
+      "split": "dev",
+      "source": "ui:0c13e94e8042850f",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-settle",
+        "element": "dialog",
+        "subject": {
+          "box": {
+            "x": 400,
+            "y": 220,
+            "w": 480,
+            "h": 280
+          },
+          "seen": "at-rest"
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A dialog animates in. Once it has finished animating, the dialog occupies the box x=400, y=220, w=480, h=280 (pixels). At which frame has it finished animating, that is, the first frame from which it no longer visibly changes?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 29,
+        "tolerance": 2
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-modal-200-snappy-start",
+      "split": "heldout",
+      "source": "ui:4017ee0cdd499c72",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-start",
+        "element": "dialog",
+        "subject": {
+          "box": {
+            "x": 400,
+            "y": 220,
+            "w": 480,
+            "h": 280
+          },
+          "seen": "at-rest"
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A dialog animates in. Once it has finished animating, the dialog occupies the box x=400, y=220, w=480, h=280 (pixels). At which frame does the dialog first visibly change (move or fade)?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 10,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-modal-200-snappy-settle",
+      "split": "heldout",
+      "source": "ui:4017ee0cdd499c72",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-settle",
+        "element": "dialog",
+        "subject": {
+          "box": {
+            "x": 400,
+            "y": 220,
+            "w": 480,
+            "h": 280
+          },
+          "seen": "at-rest"
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A dialog animates in. Once it has finished animating, the dialog occupies the box x=400, y=220, w=480, h=280 (pixels). At which frame has it finished animating, that is, the first frame from which it no longer visibly changes?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 18,
+        "tolerance": 2
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-modal-scrim-start",
+      "split": "heldout",
+      "source": "ui:0d62a9a89cba1f84",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-start",
+        "element": "dialog",
+        "subject": {
+          "box": {
+            "x": 400,
+            "y": 220,
+            "w": 480,
+            "h": 280
+          },
+          "seen": "at-rest"
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A dialog animates in. Once it has finished animating, the dialog occupies the box x=400, y=220, w=480, h=280 (pixels). At which frame does the dialog first visibly change (move or fade)?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 21,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-modal-scrim-settle",
+      "split": "heldout",
+      "source": "ui:0d62a9a89cba1f84",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-settle",
+        "element": "dialog",
+        "subject": {
+          "box": {
+            "x": 400,
+            "y": 220,
+            "w": 480,
+            "h": 280
+          },
+          "seen": "at-rest"
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A dialog animates in. Once it has finished animating, the dialog occupies the box x=400, y=220, w=480, h=280 (pixels). At which frame has it finished animating, that is, the first frame from which it no longer visibly changes?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 43,
+        "tolerance": 2
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-tooltip-start",
+      "split": "heldout",
+      "source": "ui:38a768747b74fb99",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-start",
+        "element": "tooltip",
+        "subject": {
+          "box": {
+            "x": 900,
+            "y": 140,
+            "w": 180,
+            "h": 36
+          },
+          "seen": "at-rest"
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A tooltip animates in. Once it has finished animating, the tooltip occupies the box x=900, y=140, w=180, h=36 (pixels). At which frame does the tooltip first visibly change (move or fade)?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 25,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-tooltip-settle",
+      "split": "dev",
+      "source": "ui:38a768747b74fb99",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-settle",
+        "element": "tooltip",
+        "subject": {
+          "box": {
+            "x": 900,
+            "y": 140,
+            "w": 180,
+            "h": 36
+          },
+          "seen": "at-rest"
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A tooltip animates in. Once it has finished animating, the tooltip occupies the box x=900, y=140, w=180, h=36 (pixels). At which frame has it finished animating, that is, the first frame from which it no longer visibly changes?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 33,
+        "tolerance": 2
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-popover-fade-start",
+      "split": "heldout",
+      "source": "ui:d4bf710e079e3b6b",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-start",
+        "element": "popover",
+        "subject": {
+          "box": {
+            "x": 820,
+            "y": 120,
+            "w": 260,
+            "h": 160
+          },
+          "seen": "at-rest"
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A popover animates in. Once it has finished animating, the popover occupies the box x=820, y=120, w=260, h=160 (pixels). At which frame does the popover first visibly change (move or fade)?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 7,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-popover-fade-settle",
+      "split": "dev",
+      "source": "ui:d4bf710e079e3b6b",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-settle",
+        "element": "popover",
+        "subject": {
+          "box": {
+            "x": 820,
+            "y": 120,
+            "w": 260,
+            "h": 160
+          },
+          "seen": "at-rest"
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A popover animates in. Once it has finished animating, the popover occupies the box x=820, y=120, w=260, h=160 (pixels). At which frame has it finished animating, that is, the first frame from which it no longer visibly changes?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 21,
+        "tolerance": 2
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-modal-slide-start",
+      "split": "dev",
+      "source": "ui:ace1b7f81a8c9fc8",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-start",
+        "element": "dialog",
+        "subject": {
+          "box": {
+            "x": 400,
+            "y": 380,
+            "w": 480,
+            "h": 280
+          },
+          "seen": "first-frame"
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A dialog animates in. At 0f the dialog is inside the box x=400, y=380, w=480, h=280 (pixels). At which frame does the dialog first visibly change (move or fade)?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 17,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-modal-slide-settle",
+      "split": "dev",
+      "source": "ui:ace1b7f81a8c9fc8",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-settle",
+        "element": "dialog",
+        "subject": {
+          "box": {
+            "x": 400,
+            "y": 380,
+            "w": 480,
+            "h": 280
+          },
+          "seen": "first-frame"
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A dialog animates in. At 0f the dialog is inside the box x=400, y=380, w=480, h=280 (pixels). At which frame has it finished animating, that is, the first frame from which it no longer visibly changes?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 44,
+        "tolerance": 2
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-modal-spinner-start",
+      "split": "dev",
+      "source": "ui:3bc7995fd64caeb9",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-start",
+        "element": "dialog",
+        "subject": {
+          "box": {
+            "x": 400,
+            "y": 220,
+            "w": 480,
+            "h": 280
+          },
+          "seen": "at-rest"
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A dialog animates in. Once it has finished animating, the dialog occupies the box x=400, y=220, w=480, h=280 (pixels). At which frame does the dialog first visibly change (move or fade)?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 22,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-modal-spinner-settle",
+      "split": "dev",
+      "source": "ui:3bc7995fd64caeb9",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-settle",
+        "element": "dialog",
+        "subject": {
+          "box": {
+            "x": 400,
+            "y": 220,
+            "w": 480,
+            "h": 280
+          },
+          "seen": "at-rest"
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A dialog animates in. Once it has finished animating, the dialog occupies the box x=400, y=220, w=480, h=280 (pixels). At which frame has it finished animating, that is, the first frame from which it no longer visibly changes?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 41,
+        "tolerance": 2
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-popover-crf38-start",
+      "split": "dev",
+      "source": "ui:d6501d2255dc0851",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-start",
+        "element": "popover",
+        "subject": {
+          "box": {
+            "x": 160,
+            "y": 380,
+            "w": 300,
+            "h": 180
+          },
+          "seen": "at-rest"
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A popover animates in. Once it has finished animating, the popover occupies the box x=160, y=380, w=300, h=180 (pixels). At which frame does the popover first visibly change (move or fade)?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 31,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-popover-crf38-settle",
+      "split": "dev",
+      "source": "ui:d6501d2255dc0851",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-settle",
+        "element": "popover",
+        "subject": {
+          "box": {
+            "x": 160,
+            "y": 380,
+            "w": 300,
+            "h": 180
+          },
+          "seen": "at-rest"
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A popover animates in. Once it has finished animating, the popover occupies the box x=160, y=380, w=300, h=180 (pixels). At which frame has it finished animating, that is, the first frame from which it no longer visibly changes?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 42,
+        "tolerance": 2
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-tooltip-spinner-crf35-start",
+      "split": "dev",
+      "source": "ui:99ac22ab7d5d0ce8",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-start",
+        "element": "tooltip",
+        "subject": {
+          "box": {
+            "x": 120,
+            "y": 200,
+            "w": 150,
+            "h": 32
+          },
+          "seen": "at-rest"
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A tooltip animates in. Once it has finished animating, the tooltip occupies the box x=120, y=200, w=150, h=32 (pixels). At which frame does the tooltip first visibly change (move or fade)?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 16,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-tooltip-spinner-crf35-settle",
+      "split": "dev",
+      "source": "ui:99ac22ab7d5d0ce8",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-settle",
+        "element": "tooltip",
+        "subject": {
+          "box": {
+            "x": 120,
+            "y": 200,
+            "w": 150,
+            "h": 32
+          },
+          "seen": "at-rest"
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A tooltip animates in. Once it has finished animating, the tooltip occupies the box x=120, y=200, w=150, h=32 (pixels). At which frame has it finished animating, that is, the first frame from which it no longer visibly changes?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 25,
+        "tolerance": 2
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-toast-right-start",
+      "split": "dev",
+      "source": "ui:c53df7a662b9ccec",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-start",
+        "element": "toast",
+        "subject": {
+          "box": {
+            "x": 916,
+            "y": 80,
+            "w": 340,
+            "h": 64
+          },
+          "seen": "at-rest"
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A toast animates in. Once it has finished animating, the toast occupies the box x=916, y=80, w=340, h=64 (pixels). At which frame does the toast first visibly change (move or fade)?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 13,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-toast-right-settle",
+      "split": "dev",
+      "source": "ui:c53df7a662b9ccec",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-settle",
+        "element": "toast",
+        "subject": {
+          "box": {
+            "x": 916,
+            "y": 80,
+            "w": 340,
+            "h": 64
+          },
+          "seen": "at-rest"
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A toast animates in. Once it has finished animating, the toast occupies the box x=916, y=80, w=340, h=64 (pixels). At which frame has it finished animating, that is, the first frame from which it no longer visibly changes?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 36,
+        "tolerance": 2
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-snackbar-pulse-start",
+      "split": "heldout",
+      "source": "ui:71cd10cd737b05db",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-start",
+        "element": "snackbar",
+        "subject": {
+          "box": {
+            "x": 430,
+            "y": 624,
+            "w": 420,
+            "h": 64
+          },
+          "seen": "at-rest"
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A snackbar animates in. Once it has finished animating, the snackbar occupies the box x=430, y=624, w=420, h=64 (pixels). At which frame does the snackbar first visibly change (move or fade)?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 35,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-snackbar-pulse-settle",
+      "split": "heldout",
+      "source": "ui:71cd10cd737b05db",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-settle",
+        "element": "snackbar",
+        "subject": {
+          "box": {
+            "x": 430,
+            "y": 624,
+            "w": 420,
+            "h": 64
+          },
+          "seen": "at-rest"
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A snackbar animates in. Once it has finished animating, the snackbar occupies the box x=430, y=624, w=420, h=64 (pixels). At which frame has it finished animating, that is, the first frame from which it no longer visibly changes?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 47,
+        "tolerance": 2
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-toast-small-pulse-start",
+      "split": "heldout",
+      "source": "ui:9f7157803f946d14",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-start",
+        "element": "toast",
+        "subject": {
+          "box": {
+            "x": 1016,
+            "y": 80,
+            "w": 240,
+            "h": 48
+          },
+          "seen": "at-rest"
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A toast animates in. Once it has finished animating, the toast occupies the box x=1016, y=80, w=240, h=48 (pixels). At which frame does the toast first visibly change (move or fade)?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 7,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-toast-small-pulse-settle",
+      "split": "dev",
+      "source": "ui:9f7157803f946d14",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-settle",
+        "element": "toast",
+        "subject": {
+          "box": {
+            "x": 1016,
+            "y": 80,
+            "w": 240,
+            "h": 48
+          },
+          "seen": "at-rest"
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A toast animates in. Once it has finished animating, the toast occupies the box x=1016, y=80, w=240, h=48 (pixels). At which frame has it finished animating, that is, the first frame from which it no longer visibly changes?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 19,
+        "tolerance": 2
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-spring-card-start",
+      "split": "dev",
+      "source": "ui:7caf95e9b244212f",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 120
+      },
+      "givens": {
+        "_tag": "ui-start",
+        "element": "card",
+        "subject": {
+          "box": {
+            "x": 100,
+            "y": 280,
+            "w": 200,
+            "h": 140
+          },
+          "seen": "first-frame"
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A card animates in. At 0f the card is inside the box x=100, y=280, w=200, h=140 (pixels). At which frame does the card first visibly change (move or fade)?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 13,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-spring-card-settle",
+      "split": "heldout",
+      "source": "ui:7caf95e9b244212f",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 120
+      },
+      "givens": {
+        "_tag": "ui-settle",
+        "element": "card",
+        "subject": {
+          "box": {
+            "x": 100,
+            "y": 280,
+            "w": 200,
+            "h": 140
+          },
+          "seen": "first-frame"
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A card animates in. At 0f the card is inside the box x=100, y=280, w=200, h=140 (pixels). At which frame has it finished animating, that is, the first frame from which it no longer visibly changes?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 79,
+        "tolerance": 11
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-spring-cross-start",
+      "split": "heldout",
+      "source": "ui:d6c07cd5f811ff7b",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 120
+      },
+      "givens": {
+        "_tag": "ui-start",
+        "element": "card",
+        "subject": {
+          "box": {
+            "x": 900,
+            "y": 280,
+            "w": 200,
+            "h": 140
+          },
+          "seen": "first-frame"
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A card animates in. At 0f the card is inside the box x=900, y=280, w=200, h=140 (pixels). At which frame does the card first visibly change (move or fade)?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 13,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-spring-cross-settle",
+      "split": "heldout",
+      "source": "ui:d6c07cd5f811ff7b",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 120
+      },
+      "givens": {
+        "_tag": "ui-settle",
+        "element": "card",
+        "subject": {
+          "box": {
+            "x": 900,
+            "y": 280,
+            "w": 200,
+            "h": 140
+          },
+          "seen": "first-frame"
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A card animates in. At 0f the card is inside the box x=900, y=280, w=200, h=140 (pixels). At which frame has it finished animating, that is, the first frame from which it no longer visibly changes?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 50,
+        "tolerance": 11
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-easing-linear",
+      "split": "dev",
+      "source": "ui:06bd6738202b2fbb",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-easing",
+        "element": "dialog",
+        "subject": {
+          "x": 400,
+          "y": 420,
+          "w": 480,
+          "h": 280
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A dialog moves once. At 0f it is inside the box x=400, y=420, w=480, h=280 (pixels). Which easing curve does its motion follow?\n\nEnd your reply with one line `ANSWER: <label>`, where the label is one of linear, ease-in, ease-out, ease-in-out, spring.",
+      "answer": {
+        "_tag": "label",
+        "value": "linear"
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-easing-in",
+      "split": "dev",
+      "source": "ui:eef12376cffaefe2",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-easing",
+        "element": "dialog",
+        "subject": {
+          "x": 400,
+          "y": 420,
+          "w": 480,
+          "h": 280
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A dialog moves once. At 0f it is inside the box x=400, y=420, w=480, h=280 (pixels). Which easing curve does its motion follow?\n\nEnd your reply with one line `ANSWER: <label>`, where the label is one of linear, ease-in, ease-out, ease-in-out, spring.",
+      "answer": {
+        "_tag": "label",
+        "value": "ease-in"
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-easing-out",
+      "split": "heldout",
+      "source": "ui:9bb9b81f592a2d17",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-easing",
+        "element": "dialog",
+        "subject": {
+          "x": 400,
+          "y": 420,
+          "w": 480,
+          "h": 280
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A dialog moves once. At 0f it is inside the box x=400, y=420, w=480, h=280 (pixels). Which easing curve does its motion follow?\n\nEnd your reply with one line `ANSWER: <label>`, where the label is one of linear, ease-in, ease-out, ease-in-out, spring.",
+      "answer": {
+        "_tag": "label",
+        "value": "ease-out"
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-easing-in-out",
+      "split": "dev",
+      "source": "ui:8627a28bdaf48c3b",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-easing",
+        "element": "dialog",
+        "subject": {
+          "x": 400,
+          "y": 420,
+          "w": 480,
+          "h": 280
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A dialog moves once. At 0f it is inside the box x=400, y=420, w=480, h=280 (pixels). Which easing curve does its motion follow?\n\nEnd your reply with one line `ANSWER: <label>`, where the label is one of linear, ease-in, ease-out, ease-in-out, spring.",
+      "answer": {
+        "_tag": "label",
+        "value": "ease-in-out"
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-easing-css-ease",
+      "split": "heldout",
+      "source": "ui:b428df66b25576ce",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-easing",
+        "element": "dialog",
+        "subject": {
+          "x": 400,
+          "y": 400,
+          "w": 480,
+          "h": 280
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A dialog moves once. At 0f it is inside the box x=400, y=400, w=480, h=280 (pixels). Which easing curve does its motion follow?\n\nEnd your reply with one line `ANSWER: <label>`, where the label is one of linear, ease-in, ease-out, ease-in-out, spring.",
+      "answer": {
+        "_tag": "label",
+        "value": "ease-out"
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-easing-tooltip-in",
+      "split": "heldout",
+      "source": "ui:d3956119a39623ed",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-easing",
+        "element": "tooltip",
+        "subject": {
+          "x": 900,
+          "y": 200,
+          "w": 180,
+          "h": 36
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A tooltip moves once. At 0f it is inside the box x=900, y=200, w=180, h=36 (pixels). Which easing curve does its motion follow?\n\nEnd your reply with one line `ANSWER: <label>`, where the label is one of linear, ease-in, ease-out, ease-in-out, spring.",
+      "answer": {
+        "_tag": "label",
+        "value": "ease-in"
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-easing-in-out-crf38",
+      "split": "dev",
+      "source": "ui:9ee04503b45e4ca2",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-easing",
+        "element": "dialog",
+        "subject": {
+          "x": 480,
+          "y": 410,
+          "w": 320,
+          "h": 200
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A dialog moves once. At 0f it is inside the box x=480, y=410, w=320, h=200 (pixels). Which easing curve does its motion follow?\n\nEnd your reply with one line `ANSWER: <label>`, where the label is one of linear, ease-in, ease-out, ease-in-out, spring.",
+      "answer": {
+        "_tag": "label",
+        "value": "ease-in-out"
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-easing-spring",
+      "split": "heldout",
+      "source": "ui:7caf95e9b244212f",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 120
+      },
+      "givens": {
+        "_tag": "ui-easing",
+        "element": "card",
+        "subject": {
+          "x": 100,
+          "y": 280,
+          "w": 200,
+          "h": 140
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A card moves once. At 0f it is inside the box x=100, y=280, w=200, h=140 (pixels). Which easing curve does its motion follow?\n\nEnd your reply with one line `ANSWER: <label>`, where the label is one of linear, ease-in, ease-out, ease-in-out, spring.",
+      "answer": {
+        "_tag": "label",
+        "value": "spring"
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-easing-spring-stiff",
+      "split": "dev",
+      "source": "ui:849c06a474db4cc3",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 120
+      },
+      "givens": {
+        "_tag": "ui-easing",
+        "element": "card",
+        "subject": {
+          "x": 100,
+          "y": 280,
+          "w": 200,
+          "h": 140
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A card moves once. At 0f it is inside the box x=100, y=280, w=200, h=140 (pixels). Which easing curve does its motion follow?\n\nEnd your reply with one line `ANSWER: <label>`, where the label is one of linear, ease-in, ease-out, ease-in-out, spring.",
+      "answer": {
+        "_tag": "label",
+        "value": "spring"
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-easing-linear-small",
+      "split": "heldout",
+      "source": "ui:ce7ac13156e032dc",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-easing",
+        "element": "tooltip",
+        "subject": {
+          "x": 200,
+          "y": 200,
+          "w": 120,
+          "h": 32
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A tooltip moves once. At 0f it is inside the box x=200, y=200, w=120, h=32 (pixels). Which easing curve does its motion follow?\n\nEnd your reply with one line `ANSWER: <label>`, where the label is one of linear, ease-in, ease-out, ease-in-out, spring.",
+      "answer": {
+        "_tag": "label",
+        "value": "linear"
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-overshoot-170-12",
+      "split": "heldout",
+      "source": "ui:e73f5818e3adae59",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 120
+      },
+      "givens": {
+        "_tag": "ui-overshoot",
+        "element": "card",
+        "subject": {
+          "x": 100,
+          "y": 280,
+          "w": 200,
+          "h": 140
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A card springs to a new position. At 0f it is inside the box x=100, y=280, w=200, h=140 (pixels). How many times does it reverse direction before it comes to rest? Count only reversals at least 1 pixel away from where it finally rests; answer 0 if it never overshoots.\n\nEnd your reply with one line `ANSWER: <whole number>`, for example `ANSWER: 4`.",
+      "answer": {
+        "_tag": "count",
+        "value": 3
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-overshoot-300-20",
+      "split": "dev",
+      "source": "ui:11b685c5de2e1d0a",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 120
+      },
+      "givens": {
+        "_tag": "ui-overshoot",
+        "element": "card",
+        "subject": {
+          "x": 100,
+          "y": 280,
+          "w": 200,
+          "h": 140
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A card springs to a new position. At 0f it is inside the box x=100, y=280, w=200, h=140 (pixels). How many times does it reverse direction before it comes to rest? Count only reversals at least 1 pixel away from where it finally rests; answer 0 if it never overshoots.\n\nEnd your reply with one line `ANSWER: <whole number>`, for example `ANSWER: 4`.",
+      "answer": {
+        "_tag": "count",
+        "value": 2
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-overshoot-overdamped",
+      "split": "dev",
+      "source": "ui:716cbd192393d0dc",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 120
+      },
+      "givens": {
+        "_tag": "ui-overshoot",
+        "element": "card",
+        "subject": {
+          "x": 100,
+          "y": 280,
+          "w": 200,
+          "h": 140
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A card springs to a new position. At 0f it is inside the box x=100, y=280, w=200, h=140 (pixels). How many times does it reverse direction before it comes to rest? Count only reversals at least 1 pixel away from where it finally rests; answer 0 if it never overshoots.\n\nEnd your reply with one line `ANSWER: <whole number>`, for example `ANSWER: 4`.",
+      "answer": {
+        "_tag": "count",
+        "value": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-overshoot-400-14",
+      "split": "dev",
+      "source": "ui:e8d056958d798c98",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 120
+      },
+      "givens": {
+        "_tag": "ui-overshoot",
+        "element": "card",
+        "subject": {
+          "x": 100,
+          "y": 280,
+          "w": 200,
+          "h": 140
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A card springs to a new position. At 0f it is inside the box x=100, y=280, w=200, h=140 (pixels). How many times does it reverse direction before it comes to rest? Count only reversals at least 1 pixel away from where it finally rests; answer 0 if it never overshoots.\n\nEnd your reply with one line `ANSWER: <whole number>`, for example `ANSWER: 4`.",
+      "answer": {
+        "_tag": "count",
+        "value": 5
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-overshoot-small",
+      "split": "dev",
+      "source": "ui:ee24e6a66f127224",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 120
+      },
+      "givens": {
+        "_tag": "ui-overshoot",
+        "element": "card",
+        "subject": {
+          "x": 100,
+          "y": 420,
+          "w": 80,
+          "h": 50
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A card springs to a new position. At 0f it is inside the box x=100, y=420, w=80, h=50 (pixels). How many times does it reverse direction before it comes to rest? Count only reversals at least 1 pixel away from where it finally rests; answer 0 if it never overshoots.\n\nEnd your reply with one line `ANSWER: <whole number>`, for example `ANSWER: 4`.",
+      "answer": {
+        "_tag": "count",
+        "value": 2
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-overshoot-left-cross",
+      "split": "dev",
+      "source": "ui:26839ef123d65555",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 120
+      },
+      "givens": {
+        "_tag": "ui-overshoot",
+        "element": "card",
+        "subject": {
+          "x": 900,
+          "y": 280,
+          "w": 200,
+          "h": 140
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A card springs to a new position. At 0f it is inside the box x=900, y=280, w=200, h=140 (pixels). How many times does it reverse direction before it comes to rest? Count only reversals at least 1 pixel away from where it finally rests; answer 0 if it never overshoots.\n\nEnd your reply with one line `ANSWER: <whole number>`, for example `ANSWER: 4`.",
+      "answer": {
+        "_tag": "count",
+        "value": 2
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-overshoot-crf38",
+      "split": "heldout",
+      "source": "ui:d9e8daec509ebfae",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 120
+      },
+      "givens": {
+        "_tag": "ui-overshoot",
+        "element": "card",
+        "subject": {
+          "x": 100,
+          "y": 280,
+          "w": 200,
+          "h": 140
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A card springs to a new position. At 0f it is inside the box x=100, y=280, w=200, h=140 (pixels). How many times does it reverse direction before it comes to rest? Count only reversals at least 1 pixel away from where it finally rests; answer 0 if it never overshoots.\n\nEnd your reply with one line `ANSWER: <whole number>`, for example `ANSWER: 4`.",
+      "answer": {
+        "_tag": "count",
+        "value": 3
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-jank-basic-repeat",
+      "split": "heldout",
+      "source": "ui:0636846dc4ec1b22",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "ui-repeat",
+        "subject": {
+          "x": 100,
+          "y": 320,
+          "w": 80,
+          "h": 80
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A box moves across the page in steps. At 0f it is inside the box x=100, y=320, w=80, h=80 (pixels). While it is moving, at some frames it fails to advance and repeats its position from the frame before. Which frames are those repeats?\n\nEnd your reply with one line listing every such frame, `ANSWER: <address>, <address>, ...`, for example `ANSWER: #12, #40`.",
+      "answer": {
+        "_tag": "frames",
+        "indices": [20],
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-jank-basic-skip",
+      "split": "dev",
+      "source": "ui:0636846dc4ec1b22",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "ui-skip",
+        "subject": {
+          "x": 100,
+          "y": 320,
+          "w": 80,
+          "h": 80
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A box moves across the page in steps. At 0f it is inside the box x=100, y=320, w=80, h=80 (pixels). While it is moving, at some frames it jumps twice as far as usual because a frame was dropped. At which frames does it land after such a jump?\n\nEnd your reply with one line listing every such frame, `ANSWER: <address>, <address>, ...`, for example `ANSWER: #12, #40`.",
+      "answer": {
+        "_tag": "frames",
+        "indices": [40],
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-jank-pair-repeat",
+      "split": "dev",
+      "source": "ui:f30a8758942e8d55",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "ui-repeat",
+        "subject": {
+          "x": 100,
+          "y": 320,
+          "w": 80,
+          "h": 80
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A box moves across the page in steps. At 0f it is inside the box x=100, y=320, w=80, h=80 (pixels). While it is moving, at some frames it fails to advance and repeats its position from the frame before. Which frames are those repeats?\n\nEnd your reply with one line listing every such frame, `ANSWER: <address>, <address>, ...`, for example `ANSWER: #12, #40`.",
+      "answer": {
+        "_tag": "frames",
+        "indices": [12, 30, 31],
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-jank-pair-skip",
+      "split": "dev",
+      "source": "ui:f30a8758942e8d55",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "ui-skip",
+        "subject": {
+          "x": 100,
+          "y": 320,
+          "w": 80,
+          "h": 80
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A box moves across the page in steps. At 0f it is inside the box x=100, y=320, w=80, h=80 (pixels). While it is moving, at some frames it jumps twice as far as usual because a frame was dropped. At which frames does it land after such a jump?\n\nEnd your reply with one line listing every such frame, `ANSWER: <address>, <address>, ...`, for example `ANSWER: #12, #40`.",
+      "answer": {
+        "_tag": "frames",
+        "indices": [50],
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-jank-catchup-repeat",
+      "split": "heldout",
+      "source": "ui:d5ebce2f402e72d8",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "ui-repeat",
+        "subject": {
+          "x": 100,
+          "y": 320,
+          "w": 80,
+          "h": 80
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A box moves across the page in steps. At 0f it is inside the box x=100, y=320, w=80, h=80 (pixels). While it is moving, at some frames it fails to advance and repeats its position from the frame before. Which frames are those repeats?\n\nEnd your reply with one line listing every such frame, `ANSWER: <address>, <address>, ...`, for example `ANSWER: #12, #40`.",
+      "answer": {
+        "_tag": "frames",
+        "indices": [25],
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-jank-catchup-skip",
+      "split": "dev",
+      "source": "ui:d5ebce2f402e72d8",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "ui-skip",
+        "subject": {
+          "x": 100,
+          "y": 320,
+          "w": 80,
+          "h": 80
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A box moves across the page in steps. At 0f it is inside the box x=100, y=320, w=80, h=80 (pixels). While it is moving, at some frames it jumps twice as far as usual because a frame was dropped. At which frames does it land after such a jump?\n\nEnd your reply with one line listing every such frame, `ANSWER: <address>, <address>, ...`, for example `ANSWER: #12, #40`.",
+      "answer": {
+        "_tag": "frames",
+        "indices": [26],
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-jank-spinner-repeat",
+      "split": "dev",
+      "source": "ui:13a2b3de0114859c",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "ui-repeat",
+        "subject": {
+          "x": 100,
+          "y": 320,
+          "w": 80,
+          "h": 80
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A box moves across the page in steps. At 0f it is inside the box x=100, y=320, w=80, h=80 (pixels). While it is moving, at some frames it fails to advance and repeats its position from the frame before. Which frames are those repeats?\n\nEnd your reply with one line listing every such frame, `ANSWER: <address>, <address>, ...`, for example `ANSWER: #12, #40`.",
+      "answer": {
+        "_tag": "frames",
+        "indices": [15, 45],
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-jank-spinner-skip",
+      "split": "dev",
+      "source": "ui:13a2b3de0114859c",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "ui-skip",
+        "subject": {
+          "x": 100,
+          "y": 320,
+          "w": 80,
+          "h": 80
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A box moves across the page in steps. At 0f it is inside the box x=100, y=320, w=80, h=80 (pixels). While it is moving, at some frames it jumps twice as far as usual because a frame was dropped. At which frames does it land after such a jump?\n\nEnd your reply with one line listing every such frame, `ANSWER: <address>, <address>, ...`, for example `ANSWER: #12, #40`.",
+      "answer": {
+        "_tag": "frames",
+        "indices": [60],
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-jank-small-crf35-repeat",
+      "split": "heldout",
+      "source": "ui:e653e9243ea0b523",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "ui-repeat",
+        "subject": {
+          "x": 100,
+          "y": 480,
+          "w": 24,
+          "h": 24
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A box moves across the page in steps. At 0f it is inside the box x=100, y=480, w=24, h=24 (pixels). While it is moving, at some frames it fails to advance and repeats its position from the frame before. Which frames are those repeats?\n\nEnd your reply with one line listing every such frame, `ANSWER: <address>, <address>, ...`, for example `ANSWER: #12, #40`.",
+      "answer": {
+        "_tag": "frames",
+        "indices": [33],
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-jank-small-crf35-skip",
+      "split": "dev",
+      "source": "ui:e653e9243ea0b523",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "ui-skip",
+        "subject": {
+          "x": 100,
+          "y": 480,
+          "w": 24,
+          "h": 24
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A box moves across the page in steps. At 0f it is inside the box x=100, y=480, w=24, h=24 (pixels). While it is moving, at some frames it jumps twice as far as usual because a frame was dropped. At which frames does it land after such a jump?\n\nEnd your reply with one line listing every such frame, `ANSWER: <address>, <address>, ...`, for example `ANSWER: #12, #40`.",
+      "answer": {
+        "_tag": "frames",
+        "indices": [18, 52],
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-jank-many-repeat",
+      "split": "dev",
+      "source": "ui:b9cde56df85df180",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "ui-repeat",
+        "subject": {
+          "x": 100,
+          "y": 320,
+          "w": 80,
+          "h": 80
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A box moves across the page in steps. At 0f it is inside the box x=100, y=320, w=80, h=80 (pixels). While it is moving, at some frames it fails to advance and repeats its position from the frame before. Which frames are those repeats?\n\nEnd your reply with one line listing every such frame, `ANSWER: <address>, <address>, ...`, for example `ANSWER: #12, #40`.",
+      "answer": {
+        "_tag": "frames",
+        "indices": [10, 40, 70],
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-jank-many-skip",
+      "split": "dev",
+      "source": "ui:b9cde56df85df180",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "ui-skip",
+        "subject": {
+          "x": 100,
+          "y": 320,
+          "w": 80,
+          "h": 80
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A box moves across the page in steps. At 0f it is inside the box x=100, y=320, w=80, h=80 (pixels). While it is moving, at some frames it jumps twice as far as usual because a frame was dropped. At which frames does it land after such a jump?\n\nEnd your reply with one line listing every such frame, `ANSWER: <address>, <address>, ...`, for example `ANSWER: #12, #40`.",
+      "answer": {
+        "_tag": "frames",
+        "indices": [41, 71],
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-jank-slow-repeat",
+      "split": "heldout",
+      "source": "ui:b2d31e341f39f509",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "ui-repeat",
+        "subject": {
+          "x": 100,
+          "y": 200,
+          "w": 48,
+          "h": 48
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A box moves across the page in steps. At 0f it is inside the box x=100, y=200, w=48, h=48 (pixels). While it is moving, at some frames it fails to advance and repeats its position from the frame before. Which frames are those repeats?\n\nEnd your reply with one line listing every such frame, `ANSWER: <address>, <address>, ...`, for example `ANSWER: #12, #40`.",
+      "answer": {
+        "_tag": "frames",
+        "indices": [22],
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-jank-slow-skip",
+      "split": "heldout",
+      "source": "ui:b2d31e341f39f509",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "ui-skip",
+        "subject": {
+          "x": 100,
+          "y": 200,
+          "w": 48,
+          "h": 48
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A box moves across the page in steps. At 0f it is inside the box x=100, y=200, w=48, h=48 (pixels). While it is moving, at some frames it jumps twice as far as usual because a frame was dropped. At which frames does it land after such a jump?\n\nEnd your reply with one line listing every such frame, `ANSWER: <address>, <address>, ...`, for example `ANSWER: #12, #40`.",
+      "answer": {
+        "_tag": "frames",
+        "indices": [48],
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-jank-wide-repeat",
+      "split": "heldout",
+      "source": "ui:a975340c54b4611c",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "ui-repeat",
+        "subject": {
+          "x": 40,
+          "y": 320,
+          "w": 120,
+          "h": 120
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A box moves across the page in steps. At 0f it is inside the box x=40, y=320, w=120, h=120 (pixels). While it is moving, at some frames it fails to advance and repeats its position from the frame before. Which frames are those repeats?\n\nEnd your reply with one line listing every such frame, `ANSWER: <address>, <address>, ...`, for example `ANSWER: #12, #40`.",
+      "answer": {
+        "_tag": "frames",
+        "indices": [35, 36],
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-jank-wide-skip",
+      "split": "heldout",
+      "source": "ui:a975340c54b4611c",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 90
+      },
+      "givens": {
+        "_tag": "ui-skip",
+        "subject": {
+          "x": 40,
+          "y": 320,
+          "w": 120,
+          "h": 120
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A box moves across the page in steps. At 0f it is inside the box x=40, y=320, w=120, h=120 (pixels). While it is moving, at some frames it jumps twice as far as usual because a frame was dropped. At which frames does it land after such a jump?\n\nEnd your reply with one line listing every such frame, `ANSWER: <address>, <address>, ...`, for example `ANSWER: #12, #40`.",
+      "answer": {
+        "_tag": "frames",
+        "indices": [64],
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-nav-dissolve-change",
+      "split": "dev",
+      "source": "ui:209322a337c40cb2",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 120
+      },
+      "givens": {
+        "_tag": "ui-screen-change"
+      },
+      "prompt": "This is a screen recording of a web page. Partway through, the app navigates to a different page. At which frame does the new page first become visible?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 61,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-nav-dissolve-flash",
+      "split": "dev",
+      "source": "ui:209322a337c40cb2",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 120
+      },
+      "givens": {
+        "_tag": "ui-flash"
+      },
+      "prompt": "This is a screen recording of a web page. At one frame the whole page flashes white. At which frame?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 100,
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-nav-instant-change",
+      "split": "dev",
+      "source": "ui:b97610e5525aca7d",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 120
+      },
+      "givens": {
+        "_tag": "ui-screen-change"
+      },
+      "prompt": "This is a screen recording of a web page. Partway through, the app navigates to a different page. At which frame does the new page first become visible?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 36,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-nav-instant-flash",
+      "split": "dev",
+      "source": "ui:b97610e5525aca7d",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 120
+      },
+      "givens": {
+        "_tag": "ui-flash"
+      },
+      "prompt": "This is a screen recording of a web page. At one frame the whole page flashes white. At which frame?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 30,
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-nav-ease-in-spinner-change",
+      "split": "dev",
+      "source": "ui:a6be78567fc52913",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 120
+      },
+      "givens": {
+        "_tag": "ui-screen-change"
+      },
+      "prompt": "This is a screen recording of a web page. Partway through, the app navigates to a different page. At which frame does the new page first become visible?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 51,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-nav-ease-in-spinner-flash",
+      "split": "heldout",
+      "source": "ui:a6be78567fc52913",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 120
+      },
+      "givens": {
+        "_tag": "ui-flash"
+      },
+      "prompt": "This is a screen recording of a web page. At one frame the whole page flashes white. At which frame?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 95,
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-nav-slide-light-change",
+      "split": "dev",
+      "source": "ui:9eccc05481b54ca6",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 120
+      },
+      "givens": {
+        "_tag": "ui-screen-change"
+      },
+      "prompt": "This is a screen recording of a web page. Partway through, the app navigates to a different page. At which frame does the new page first become visible?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 31,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-nav-short-crf35-change",
+      "split": "dev",
+      "source": "ui:b55c4fe40fb4eb81",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 120
+      },
+      "givens": {
+        "_tag": "ui-screen-change"
+      },
+      "prompt": "This is a screen recording of a web page. Partway through, the app navigates to a different page. At which frame does the new page first become visible?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 73,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-nav-short-crf35-flash",
+      "split": "heldout",
+      "source": "ui:b55c4fe40fb4eb81",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 120
+      },
+      "givens": {
+        "_tag": "ui-flash"
+      },
+      "prompt": "This is a screen recording of a web page. At one frame the whole page flashes white. At which frame?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 60,
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-nav-light-slow-change",
+      "split": "heldout",
+      "source": "ui:b105fa37c93ec0f7",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 120
+      },
+      "givens": {
+        "_tag": "ui-screen-change"
+      },
+      "prompt": "This is a screen recording of a web page. Partway through, the app navigates to a different page. At which frame does the new page first become visible?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 21,
+        "tolerance": 2
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-nav-light-slow-flash",
+      "split": "dev",
+      "source": "ui:b105fa37c93ec0f7",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 120
+      },
+      "givens": {
+        "_tag": "ui-flash"
+      },
+      "prompt": "This is a screen recording of a web page. At one frame the whole page flashes white. At which frame?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 110,
+        "tolerance": 0
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-safe-right-5-safe",
+      "split": "dev",
+      "source": "ui:25fa38dcbf53484f",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 100
+      },
+      "givens": {
+        "_tag": "ui-safe-area",
+        "subject": {
+          "x": 200,
+          "y": 200,
+          "w": 160,
+          "h": 60
+        },
+        "marginPercent": 5
+      },
+      "prompt": "This is a screen recording of a web page. A badge moves across the page. At 0f it is inside the box x=200, y=200, w=160, h=60 (pixels). The safe area is inset 5% from each edge of the frame. What is the first frame where any part of the badge is outside the safe area?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 54,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-safe-right-5-reverse",
+      "split": "dev",
+      "source": "ui:25fa38dcbf53484f",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 100
+      },
+      "givens": {
+        "_tag": "ui-reverse",
+        "subject": {
+          "x": 220,
+          "y": 448,
+          "w": 40,
+          "h": 40
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A progress bar fills from left to right; its knob is at x=220, y=448, w=40, h=40 (pixels) at 0f. At one point the progress goes backwards for a moment. At which frame is the knob first further left than in the frame before?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 50,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-safe-left-10-safe",
+      "split": "dev",
+      "source": "ui:27db9490d74f2782",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 100
+      },
+      "givens": {
+        "_tag": "ui-safe-area",
+        "subject": {
+          "x": 900,
+          "y": 200,
+          "w": 160,
+          "h": 60
+        },
+        "marginPercent": 10
+      },
+      "prompt": "This is a screen recording of a web page. A badge moves across the page. At 0f it is inside the box x=900, y=200, w=160, h=60 (pixels). The safe area is inset 10% from each edge of the frame. What is the first frame where any part of the badge is outside the safe area?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 65,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-safe-left-10-reverse",
+      "split": "heldout",
+      "source": "ui:27db9490d74f2782",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 100
+      },
+      "givens": {
+        "_tag": "ui-reverse",
+        "subject": {
+          "x": 220,
+          "y": 448,
+          "w": 40,
+          "h": 40
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A progress bar fills from left to right; its knob is at x=220, y=448, w=40, h=40 (pixels) at 0f. At one point the progress goes backwards for a moment. At which frame is the knob first further left than in the frame before?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 30,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-safe-small-diag-safe",
+      "split": "heldout",
+      "source": "ui:9b66b692af8d5d54",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 100
+      },
+      "givens": {
+        "_tag": "ui-safe-area",
+        "subject": {
+          "x": 300,
+          "y": 300,
+          "w": 60,
+          "h": 24
+        },
+        "marginPercent": 5
+      },
+      "prompt": "This is a screen recording of a web page. A badge moves across the page. At 0f it is inside the box x=300, y=300, w=60, h=24 (pixels). The safe area is inset 5% from each edge of the frame. What is the first frame where any part of the badge is outside the safe area?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 86,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-safe-small-diag-reverse",
+      "split": "dev",
+      "source": "ui:9b66b692af8d5d54",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 100
+      },
+      "givens": {
+        "_tag": "ui-reverse",
+        "subject": {
+          "x": 220,
+          "y": 448,
+          "w": 40,
+          "h": 40
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A progress bar fills from left to right; its knob is at x=220, y=448, w=40, h=40 (pixels) at 0f. At one point the progress goes backwards for a moment. At which frame is the knob first further left than in the frame before?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 70,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-safe-overlap-10-safe",
+      "split": "heldout",
+      "source": "ui:a47668ab1687eddf",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 100
+      },
+      "givens": {
+        "_tag": "ui-safe-area",
+        "subject": {
+          "x": 300,
+          "y": 440,
+          "w": 160,
+          "h": 60
+        },
+        "marginPercent": 10
+      },
+      "prompt": "This is a screen recording of a web page. A badge moves across the page. At 0f it is inside the box x=300, y=440, w=160, h=60 (pixels). The safe area is inset 10% from each edge of the frame. What is the first frame where any part of the badge is outside the safe area?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 70,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-safe-overlap-10-reverse",
+      "split": "heldout",
+      "source": "ui:a47668ab1687eddf",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 100
+      },
+      "givens": {
+        "_tag": "ui-reverse",
+        "subject": {
+          "x": 220,
+          "y": 448,
+          "w": 40,
+          "h": 40
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A progress bar fills from left to right; its knob is at x=220, y=448, w=40, h=40 (pixels) at 0f. At one point the progress goes backwards for a moment. At which frame is the knob first further left than in the frame before?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 40,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-safe-fast-crf38-safe",
+      "split": "heldout",
+      "source": "ui:7a7cbb9f82bbe434",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 100
+      },
+      "givens": {
+        "_tag": "ui-safe-area",
+        "subject": {
+          "x": 500,
+          "y": 200,
+          "w": 160,
+          "h": 60
+        },
+        "marginPercent": 5
+      },
+      "prompt": "This is a screen recording of a web page. A badge moves across the page. At 0f it is inside the box x=500, y=200, w=160, h=60 (pixels). The safe area is inset 5% from each edge of the frame. What is the first frame where any part of the badge is outside the safe area?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 28,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-safe-fast-crf38-reverse",
+      "split": "dev",
+      "source": "ui:7a7cbb9f82bbe434",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 100
+      },
+      "givens": {
+        "_tag": "ui-reverse",
+        "subject": {
+          "x": 220,
+          "y": 448,
+          "w": 40,
+          "h": 40
+        }
+      },
+      "prompt": "This is a screen recording of a web page. A progress bar fills from left to right; its knob is at x=220, y=448, w=40, h=40 (pixels) at 0f. At one point the progress goes backwards for a moment. At which frame is the knob first further left than in the frame before?\n\nEnd your reply with one line `ANSWER: <frame address>`, for example `ANSWER: 01s05f` or `ANSWER: #35`.",
+      "answer": {
+        "_tag": "frame",
+        "index": 20,
+        "tolerance": 1
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-compare-snappier",
+      "split": "heldout",
+      "source": "ui:3e0be54180358a5d",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-compare",
+        "left": {
+          "x": 110,
+          "y": 540,
+          "w": 420,
+          "h": 180
+        },
+        "right": {
+          "x": 750,
+          "y": 540,
+          "w": 420,
+          "h": 180
+        }
+      },
+      "prompt": "This is a screen recording of a web page. The same sheet opens twice, side by side: before on the left (at 0f inside x=110, y=540, w=420, h=180) and after on the right (at 0f inside x=750, y=540, w=420, h=180). Each finishes animating at the first frame from which it no longer visibly changes. How many frames sooner does the right one finish than the left one? Answer a negative number if the right one finishes later.\n\nEnd your reply with one line `ANSWER: <signed whole number of frames>`, for example `ANSWER: 6` or `ANSWER: -4`.",
+      "answer": {
+        "_tag": "delta",
+        "value": 12,
+        "tolerance": 2
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-compare-ease-in",
+      "split": "dev",
+      "source": "ui:12ee0f90dd3e3e3f",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-compare",
+        "left": {
+          "x": 110,
+          "y": 540,
+          "w": 420,
+          "h": 180
+        },
+        "right": {
+          "x": 750,
+          "y": 540,
+          "w": 420,
+          "h": 180
+        }
+      },
+      "prompt": "This is a screen recording of a web page. The same sheet opens twice, side by side: before on the left (at 0f inside x=110, y=540, w=420, h=180) and after on the right (at 0f inside x=750, y=540, w=420, h=180). Each finishes animating at the first frame from which it no longer visibly changes. How many frames sooner does the right one finish than the left one? Answer a negative number if the right one finishes later.\n\nEnd your reply with one line `ANSWER: <signed whole number of frames>`, for example `ANSWER: 6` or `ANSWER: -4`.",
+      "answer": {
+        "_tag": "delta",
+        "value": 5,
+        "tolerance": 2
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-compare-slower",
+      "split": "dev",
+      "source": "ui:aa848b5b28463632",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-compare",
+        "left": {
+          "x": 110,
+          "y": 540,
+          "w": 420,
+          "h": 180
+        },
+        "right": {
+          "x": 750,
+          "y": 540,
+          "w": 420,
+          "h": 180
+        }
+      },
+      "prompt": "This is a screen recording of a web page. The same sheet opens twice, side by side: before on the left (at 0f inside x=110, y=540, w=420, h=180) and after on the right (at 0f inside x=750, y=540, w=420, h=180). Each finishes animating at the first frame from which it no longer visibly changes. How many frames sooner does the right one finish than the left one? Answer a negative number if the right one finishes later.\n\nEnd your reply with one line `ANSWER: <signed whole number of frames>`, for example `ANSWER: 6` or `ANSWER: -4`.",
+      "answer": {
+        "_tag": "delta",
+        "value": -11,
+        "tolerance": 2
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-compare-delayed",
+      "split": "heldout",
+      "source": "ui:c558f29c78f5ca6a",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-compare",
+        "left": {
+          "x": 110,
+          "y": 540,
+          "w": 420,
+          "h": 180
+        },
+        "right": {
+          "x": 750,
+          "y": 540,
+          "w": 420,
+          "h": 180
+        }
+      },
+      "prompt": "This is a screen recording of a web page. The same sheet opens twice, side by side: before on the left (at 0f inside x=110, y=540, w=420, h=180) and after on the right (at 0f inside x=750, y=540, w=420, h=180). Each finishes animating at the first frame from which it no longer visibly changes. How many frames sooner does the right one finish than the left one? Answer a negative number if the right one finishes later.\n\nEnd your reply with one line `ANSWER: <signed whole number of frames>`, for example `ANSWER: 6` or `ANSWER: -4`.",
+      "answer": {
+        "_tag": "delta",
+        "value": 3,
+        "tolerance": 2
+      },
+      "followUps": []
+    },
+    {
+      "id": "ui-compare-crf35",
+      "split": "heldout",
+      "source": "ui:5185df5a4844d3f0",
+      "clock": {
+        "rate": {
+          "num": 60,
+          "den": 1
+        },
+        "frames": 60
+      },
+      "givens": {
+        "_tag": "ui-compare",
+        "left": {
+          "x": 110,
+          "y": 540,
+          "w": 420,
+          "h": 180
+        },
+        "right": {
+          "x": 750,
+          "y": 540,
+          "w": 420,
+          "h": 180
+        }
+      },
+      "prompt": "This is a screen recording of a web page. The same sheet opens twice, side by side: before on the left (at 0f inside x=110, y=540, w=420, h=180) and after on the right (at 0f inside x=750, y=540, w=420, h=180). Each finishes animating at the first frame from which it no longer visibly changes. How many frames sooner does the right one finish than the left one? Answer a negative number if the right one finishes later.\n\nEnd your reply with one line `ANSWER: <signed whole number of frames>`, for example `ANSWER: 6` or `ANSWER: -4`.",
+      "answer": {
+        "_tag": "delta",
+        "value": 7,
+        "tolerance": 2
+      },
+      "followUps": []
+    }
+  ]
+}

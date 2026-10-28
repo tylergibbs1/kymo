@@ -5,7 +5,7 @@
  * agent's replies back and scores them exactly as the in-process loop does.
  */
 import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
+import { extname, join } from "node:path"
 import { Effect, Schema } from "effect"
 import { present } from "./Present.ts"
 import { type Score, score } from "./Score.ts"
@@ -23,8 +23,9 @@ export const Answers = Schema.Record(Schema.String, Schema.String)
 const qid = (n: number) => `q${String(n + 1).padStart(2, "0")}`
 
 /**
- * Write `questions.json` and one clip directory per question under `questionsDir`, and `key.json`
- * under `keyDir`. Clip paths are `clips/<qid>`, so nothing in a path hints at the answer.
+ * Write `questions.json` and one clip per question under `questionsDir`, and `key.json` under
+ * `keyDir`. Clip paths are `clips/<qid>` (plus `.mp4` for footage), so nothing in a path hints at the
+ * answer.
  */
 export const exportQuestions = (options: {
   readonly tasks: ReadonlyArray<Task>
@@ -40,9 +41,10 @@ export const exportQuestions = (options: {
     for (const [n, task] of options.tasks.entries()) {
       const id = qid(n)
       const presented = yield* present(task, options.cacheDir)
-      const [dir, query] = presented.split("?") as [string, string | undefined]
-      const clip = join(options.questionsDir, "clips", id)
-      symlinkSync(dir, clip, "dir")
+      const [path, query] = presented.split("?") as [string, string | undefined]
+      // A directory of frames links as clips/q01; a video keeps its extension so it opens as one.
+      const clip = join(options.questionsDir, "clips", `${id}${extname(path)}`)
+      symlinkSync(path, clip)
       questions.push({ id, source: query ? `${clip}?${query}` : clip, prompt: task.prompt })
       entries.push({ id, taskId: task.id })
     }

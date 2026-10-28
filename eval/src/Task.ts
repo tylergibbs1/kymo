@@ -26,7 +26,9 @@ export const Answer = Schema.Union([
     tolerance: NonNegativeInt
   }),
   Schema.TaggedStruct("label", { value: Schema.String.check(Schema.isNonEmpty()) }),
-  Schema.TaggedStruct("count", { value: NonNegativeInt })
+  Schema.TaggedStruct("count", { value: NonNegativeInt }),
+  /** A signed number of frames, e.g. how much sooner one variant settles than another. */
+  Schema.TaggedStruct("delta", { value: Schema.Int, tolerance: NonNegativeInt })
 ])
 export type Answer = typeof Answer.Type
 export type AnswerKind = Answer["_tag"]
@@ -34,6 +36,17 @@ export type AnswerKind = Answer["_tag"]
 /** A box in source pixels, as the tracker takes it. */
 export const Box = Schema.Struct({ x: NonNegativeInt, y: NonNegativeInt, w: PositiveInt, h: PositiveInt })
 export type Box = typeof Box.Type
+
+/** What a UI question calls the element it asks about. */
+export const UiElement = Schema.Literals(["dialog", "popover", "tooltip", "toast", "card", "snackbar"])
+export type UiElement = typeof UiElement.Type
+
+/**
+ * Where a UI element is pointed out: its box at 0f when it is visible there, or its box once it has
+ * come to rest when it enters from nothing (a fade-in, an entry from off-screen).
+ */
+export const Subject = Schema.Struct({ box: Box, seen: Schema.Literals(["first-frame", "at-rest"]) })
+export type Subject = typeof Subject.Type
 
 /**
  * What the question tells the solver, beyond the source. Prompts are rendered from these, and the
@@ -48,11 +61,27 @@ export const Givens = Schema.Union([
   Schema.TaggedStruct("safe-area", { subject: Box, marginPercent: Schema.Literals([5, 10]) }),
   Schema.TaggedStruct("cut", {}),
   Schema.TaggedStruct("dropped", {}),
+  /** UI animations captured from a browser (`eval/ui`). */
+  Schema.TaggedStruct("ui-start", { element: UiElement, subject: Subject }),
+  Schema.TaggedStruct("ui-settle", { element: UiElement, subject: Subject }),
+  Schema.TaggedStruct("ui-easing", { element: UiElement, subject: Box }),
+  Schema.TaggedStruct("ui-overshoot", { element: UiElement, subject: Box }),
+  Schema.TaggedStruct("ui-repeat", { subject: Box }),
+  Schema.TaggedStruct("ui-skip", { subject: Box }),
+  Schema.TaggedStruct("ui-screen-change", {}),
+  Schema.TaggedStruct("ui-flash", {}),
+  Schema.TaggedStruct("ui-safe-area", { subject: Box, marginPercent: Schema.Literals([5, 10]) }),
+  Schema.TaggedStruct("ui-reverse", { subject: Box }),
+  Schema.TaggedStruct("ui-compare", { left: Box, right: Box }),
   /** A real clip: the prompt is free text written in the manifest. */
   Schema.TaggedStruct("clip", { category: Schema.String })
 ])
 export type Givens = typeof Givens.Type
 export type Family = Givens["_tag"]
+export type UiGivens = Extract<Givens, { readonly _tag: `ui-${string}` }>
+export type UiFamily = UiGivens["_tag"]
+export type SyntheticGivens = Exclude<Givens, UiGivens | { readonly _tag: "clip" }>
+export const isUiGivens = (g: Givens): g is UiGivens => g._tag.startsWith("ui-")
 
 /** The clock answers are resolved against: `08s10f` means a different frame at 24 and 60 fps. */
 export const Clock = Schema.Struct({ rate: Rate, frames: PositiveInt })

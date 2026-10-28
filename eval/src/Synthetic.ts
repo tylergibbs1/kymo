@@ -7,7 +7,7 @@ import { Sources, SyntheticAdapter } from "@kymo/sources"
 import { Effect, Layer, Schema } from "effect"
 import { render } from "./Prompts.ts"
 import { splitOf } from "./Split.ts"
-import type { Answer, Box, EasingLabel, Givens, Task } from "./Task.ts"
+import type { Answer, Box, EasingLabel, SyntheticGivens, Task } from "./Task.ts"
 
 /** Ground truth that does not say what the case expected: a defect in the case list or the scene. */
 export class TruthMismatch extends Schema.TaggedError<TruthMismatch>()("TruthMismatch", {
@@ -15,7 +15,7 @@ export class TruthMismatch extends Schema.TaggedError<TruthMismatch>()("TruthMis
   message: Schema.String
 }) {}
 
-type Family = Exclude<Givens["_tag"], "clip">
+type Family = SyntheticGivens["_tag"]
 
 interface Case {
   readonly id: string
@@ -157,7 +157,7 @@ const one = (id: string, values: ReadonlyArray<number>, what: string) =>
 const truthOf = (
   k: Case,
   source: Source
-): Effect.Effect<{ givens: Givens; answer: Answer }, KymoError | TruthMismatch> =>
+): Effect.Effect<{ givens: SyntheticGivens; answer: Answer }, KymoError | TruthMismatch> =>
   Effect.gen(function* () {
     switch (k.family) {
       case "impact": {
@@ -239,8 +239,6 @@ export const buildTask = (k: Case): Effect.Effect<Task, KymoError | TruthMismatc
     const sources = yield* Sources
     const source = yield* sources.open(specOf(k), "truth")
     const { givens, answer } = yield* truthOf(k, source)
-    if (givens._tag === "clip")
-      return yield* new TruthMismatch({ id: k.id, message: "synthetic case built clip givens" })
     const t = source.timeline
     return {
       id: k.id,

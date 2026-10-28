@@ -1,0 +1,84 @@
+<!doctype html>
+<!--
+  A page change: the next page cross-dissolves over the current one.
+  at: ms the dissolve starts. len: its length in ms (0 = an instant switch). ease: CSS easing.
+  theme: dark or light for the next page. slide: px the next page slides in from the right as it fades.
+  flash: frame index of a one-frame white flash (-1 = none). spinner: 1 adds a turning spinner.
+-->
+<html>
+  <head>
+    <link rel="stylesheet" href="common.css" />
+    <script src="scene.js"></script>
+    <style>
+      #current,
+      #next,
+      #flash {
+        position: absolute;
+        inset: 0;
+      }
+      #current {
+        background: #eef1f5;
+      }
+      #flash {
+        background: #fff;
+        display: none;
+      }
+      .card {
+        position: absolute;
+        border-radius: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="current"></div>
+    <div id="next"></div>
+    <div id="flash"></div>
+    <script>
+      const { num, str, define, spinner, backdrop } = Scene
+      const current = document.getElementById("current")
+      const next = document.getElementById("next")
+      const flash = document.getElementById("flash")
+      backdrop(current)
+      const dark = str("theme", "dark") === "dark"
+      next.style.background = dark ? "#1b1f2a" : "#f7f3ea"
+      const card = dark ? "#2c3446" : "#e3d9c4"
+      next.innerHTML =
+        `<div class="hdr" style="background:${dark ? "#0d1220" : "#6b4f2a"}">Project settings</div>` +
+        [
+          [40, 100, 380, 220],
+          [450, 100, 380, 220],
+          [860, 100, 380, 220],
+          [40, 350, 1200, 320]
+        ]
+          .map(
+            ([l, t, w, h]) =>
+              `<div class="card" style="left:${l}px;top:${t}px;width:${w}px;height:${h}px;background:${card}"></div>`
+          )
+          .join("")
+      const timing = {
+        duration: num("len", 250),
+        delay: num("at", 1000),
+        easing: str("ease", "linear"),
+        fill: "both"
+      }
+      const slide = num("slide", 0)
+      next.animate(
+        [
+          { opacity: 0, transform: `translateX(${slide}px)` },
+          { opacity: 1, transform: "translateX(0px)" }
+        ],
+        timing
+      )
+      current.animate([{ opacity: 1 }, { opacity: 0 }], timing)
+      if (num("spinner", 0)) spinner(608, 328)
+      const flashAt = num("flash", -1)
+      define({
+        frames: 120,
+        elements: { next, flash },
+        render: (i) => {
+          flash.style.display = i === flashAt ? "block" : "none"
+        }
+      })
+    </script>
+  </body>
+</html>

@@ -114,5 +114,12 @@ export const score = (answer: Answer, clock: Clock, reply: string): Score => {
       if (!/^\d+$/.test(given)) return unreadable(given, `${given} is not a whole number`)
       return { pass: Number(given) === answer.value, given, frameError: null, problem: null }
     }
+    case "delta": {
+      const m = /^([+\-\u2212]?)\s*(\d+)\s*(?:f|frames?)?$/i.exec(given)
+      if (!m) return unreadable(given, `${given} is not a signed whole number of frames`)
+      const value = (m[1] === "" || m[1] === "+" ? 1 : -1) * Number(m[2])
+      const frameError = Math.abs(value - answer.value)
+      return { pass: frameError <= answer.tolerance, given, frameError, problem: null }
+    }
   }
 }

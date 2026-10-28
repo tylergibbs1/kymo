@@ -1,0 +1,101 @@
+<!doctype html>
+<!--
+  A card moves sideways on an analytic damped spring (zero initial velocity), set as a style each frame.
+  k, c, m: stiffness, damping, mass. x0: start x. dist: px to travel (negative moves left). delay: ms.
+  y, w, h, color: the card. cross: 1 sends a translucent banner down across the card's path.
+-->
+<html>
+  <head>
+    <link rel="stylesheet" href="common.css" />
+    <script src="scene.js"></script>
+    <style>
+      #card .a {
+        position: absolute;
+        left: 14px;
+        top: 14px;
+        width: 40px;
+        height: 40px;
+        border-radius: 20px;
+      }
+      #card .b {
+        position: absolute;
+        left: 66px;
+        top: 22px;
+        width: 60%;
+        height: 10px;
+        border-radius: 5px;
+        background: #333;
+      }
+      #cross {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1280px;
+        height: 90px;
+        background: rgba(242, 163, 58, 0.55);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="card" class="panel">
+      <div class="a"></div>
+      <div class="b"></div>
+    </div>
+    <script>
+      const { num, str, define, backdrop } = Scene
+      backdrop()
+      const k = num("k", 170)
+      const c = num("c", 12)
+      const m = num("m", 1)
+      const x0 = num("x0", 100)
+      const dist = num("dist", 700)
+      const delay = num("delay", 200) / 1000
+      const w = num("w", 200)
+      const h = num("h", 140)
+      const color = str("color", "#7a3cc3")
+      const el = document.getElementById("card")
+      Object.assign(el.style, {
+        left: "0px",
+        top: `${num("y", 280)}px`,
+        width: `${w}px`,
+        height: `${h}px`,
+        boxShadow: `0 0 0 2px ${color}`
+      })
+      el.querySelector(".a").style.background = color
+
+      const w0 = Math.sqrt(k / m)
+      const z = c / (2 * Math.sqrt(k * m))
+      /** Fraction of the distance still to go, s seconds after release. */
+      const remaining = (s) => {
+        if (z < 1) {
+          const wd = w0 * Math.sqrt(1 - z * z)
+          return Math.exp(-z * w0 * s) * (Math.cos(wd * s) + ((z * w0) / wd) * Math.sin(wd * s))
+        }
+        if (z === 1) return (1 + w0 * s) * Math.exp(-w0 * s)
+        const r1 = -w0 * (z - Math.sqrt(z * z - 1))
+        const r2 = -w0 * (z + Math.sqrt(z * z - 1))
+        return (r2 * Math.exp(r1 * s) - r1 * Math.exp(r2 * s)) / (r2 - r1)
+      }
+      const xAt = (sec) => (sec <= delay ? x0 : x0 + dist * (1 - remaining(sec - delay)))
+
+      let cross = null
+      if (num("cross", 0)) {
+        cross = document.createElement("div")
+        cross.id = "cross"
+        document.body.appendChild(cross)
+        cross.animate([{ transform: "translateY(-90px)" }, { transform: "translateY(720px)" }], {
+          duration: 1500,
+          delay: 100,
+          fill: "both"
+        })
+      }
+      define({
+        frames: 120,
+        elements: { card: el },
+        render: (_i, ms) => {
+          el.style.transform = `translateX(${xAt(ms / 1000)}px)`
+        }
+      })
+    </script>
+  </body>
+</html>

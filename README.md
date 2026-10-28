@@ -72,7 +72,7 @@ On variable-frame-rate footage and GIFs, seconds are real time and frames are de
   ```
 - 🤝 **Agent-friendly contract.** stdout carries only JSON: `open`, `probe`, `scan`, `track`, `record` and `schema` print one JSON value; `frames`, `compare` and `check` print JSON Lines, one sheet or finding per line and then a summary line (`kymo schema <command>` describes both under `lines`). Errors go to stderr as `{tag, message, hint}`, with a hint that says how to fix them (`"8s10" is not an address. Use 08s10f, #250, 8.33s…`). Exit codes: 0 done, 1 a `check` that did not pass (its result is still printed), 2 bad input, 3 source not found, 4 adapter unavailable, 5 timeout, 6 backend failure. Flags are only ever added, and `kymo schema` prints every input and output JSON Schema.
 - 🖼️ **Images an API accepts.** Every image stays under 3.75 MB (5 MB as base64); a sheet of noisy footage is re-encoded with a palette, then scaled down, until it fits. A custom target can set its own `maxBytes`.
-- 🧪 **An eval decides the design.** 42 tasks with ground truth, an agent loop for Claude, and A/B experiments for sheet size, cells per sheet, label style, sampling, tool examples and text format. [Read more](eval/README.md).
+- 🧪 **An eval decides the design.** 42 synthetic tasks and 87 tasks on UI animations captured in a real browser, all with ground truth, an agent loop for Claude, and A/B experiments for sheet size, cells per sheet, label style, sampling, tool examples and text format. [Read more](eval/README.md).
 
 ## Quick start
 

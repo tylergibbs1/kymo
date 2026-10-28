@@ -1,0 +1,69 @@
+<!doctype html>
+<!--
+  Before and after, side by side: the same sheet opening with two different timings.
+  ldur, lease, ldelay / rdur, rease, rdelay: duration (ms), CSS easing and delay (ms) of the left and
+  right sheet. dist: px each rises. w, h: each sheet's size.
+-->
+<html>
+  <head>
+    <link rel="stylesheet" href="common.css" />
+    <script src="scene.js"></script>
+    <style>
+      .tag {
+        position: absolute;
+        top: 72px;
+        font-size: 18px;
+        font-weight: bold;
+        color: #13203d;
+      }
+      .divider {
+        position: absolute;
+        left: 639px;
+        top: 56px;
+        width: 2px;
+        height: 664px;
+        background: #9aa5b8;
+      }
+      .sheet {
+        box-shadow: 0 0 0 2px #2b59c3;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="divider"></div>
+    <div class="tag" style="left: 40px">Before</div>
+    <div class="tag" style="left: 680px">After</div>
+    <div id="left" class="panel sheet">
+      <h2>Share</h2>
+      <p>Anyone with the link can view.</p>
+    </div>
+    <div id="right" class="panel sheet">
+      <h2>Share</h2>
+      <p>Anyone with the link can view.</p>
+    </div>
+    <script>
+      const { num, str, define, backdrop } = Scene
+      backdrop(document.body, "Motion review")
+      const w = num("w", 420)
+      const h = num("h", 240)
+      const dist = num("dist", 120)
+      const sheets = { left: document.getElementById("left"), right: document.getElementById("right") }
+      for (const [side, el] of Object.entries(sheets)) {
+        const p = side[0]
+        Object.assign(el.style, {
+          left: `${(side === "left" ? 0 : 640) + (640 - w) / 2}px`,
+          top: `${720 - 60 - h}px`,
+          width: `${w}px`,
+          height: `${h}px`
+        })
+        el.animate([{ transform: `translateY(${dist}px)` }, { transform: "translateY(0px)" }], {
+          duration: num(`${p}dur`, 300),
+          delay: num(`${p}delay`, 100),
+          easing: str(`${p}ease`, "ease-out"),
+          fill: "both"
+        })
+      }
+      define({ frames: 60, elements: sheets })
+    </script>
+  </body>
+</html>

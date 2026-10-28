@@ -15,5 +15,8 @@
     "effect": "4.0.7",
     "kymo": "*",
     "sharp": "^0.35.5"
+  },
+  "devDependencies": {
+    "playwright": "^1.63.0"
   }
 }
