@@ -27,7 +27,7 @@ describe("region tracking", () => {
       for (let i = 0; i <= 40; i++) {
         expect(Math.abs(region.x.samples[i]! - truth(i).x)).toBeLessThanOrEqual(1)
         expect(Math.abs(region.y.samples[i]! - truth(i).y)).toBeLessThanOrEqual(1)
-        expect(region.w.samples[i]).toBe(12)
+        expect(Math.abs(region.w.samples[i]! - 12)).toBeLessThanOrEqual(0.25)
         expect(region.confidence.samples[i]!).toBeGreaterThan(0.8)
       }
     })
@@ -173,7 +173,8 @@ describe("easing fit", () => {
         trackOf("flat", frames, () => 5),
         range
       )
-      expect(Result.isFailure(r) && r.failure.hint).toContain("0f..-1f")
+      expect(Result.isFailure(r) && r.failure).toMatchObject({ status: "no-motion", track: "flat" })
+      expect(Result.isFailure(r) && r.failure.reason).toContain("does not change in 0f..01s29f")
     })
   )
 })

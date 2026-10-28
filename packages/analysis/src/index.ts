@@ -21,7 +21,18 @@ export {
   trackRegion
 } from "./Tracker.ts"
 export { type Precision, keyframeIndices } from "./Keyframes.ts"
-export { knownSamples } from "./Segment.ts"
+export {
+  type End,
+  MIN_SAMPLES,
+  type MotionOptions,
+  SegmentEnd,
+  Unfit,
+  UnfitStatus,
+  type WholeMotion,
+  findMotion,
+  knownSamples
+} from "./Segment.ts"
+export { unitScale } from "./Units.ts"
 export {
   BezierFit,
   EasingCandidate,
@@ -29,7 +40,8 @@ export {
   type EasingOptions,
   PresetFit,
   SpringFit,
-  fitEasing
+  fitEasing,
+  fitMotion
 } from "./Easing.ts"
 export { Finding, RULES, RuleName, Severity, SuggestView, parseRules } from "./Finding.ts"
 export { CheckReport, type CheckInput, check } from "./Check.ts"
