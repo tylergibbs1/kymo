@@ -39,7 +39,7 @@ const schemaFieldDescriptions = {
 }
 
 export default tseslint.config(
-  { ignores: ["**/node_modules/**", "eval/reports/**"] },
+  { ignores: ["**/node_modules/**", "eval/reports/**", ".claude/**"] },
   ...tseslint.configs.recommended,
   {
     rules: {
