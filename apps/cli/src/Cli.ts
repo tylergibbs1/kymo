@@ -1,7 +1,16 @@
 import { NodeServices } from "@effect/platform-node"
 import { BackendFailure, InvalidInput, type KymoError, exitCodes, toPayload } from "@kymo/core"
 import { VERSION, httpServer, stdioServer } from "@kymo/mcp"
-import { type AnyOperation, execute, flatInputSchema, fromEnv, jsonSchema, kymoLayer, operations } from "kymo"
+import {
+  type AnyOperation,
+  execute,
+  flatInputSchema,
+  fromEnv,
+  kymoLayer,
+  operations,
+  schemasOf,
+  toLines
+} from "kymo"
 import { Cause, Effect, Exit, Fiber, Layer, Logger, Option, Result } from "effect"
 import { Argument, CliError, CliOutput, Command, Flag } from "effect/cli"
 import { type Field, fieldsOf, inputOf, normalize, paramsOf, valueFlags } from "./Flags.ts"
@@ -30,12 +39,11 @@ const parseJson = (text: Option.Option<string>): Effect.Effect<Record<string, un
       )
 }
 
-/** JSON Lines ops print each item of one array field, then one line with everything else. */
-const print = (op: AnyOperation, result: unknown) => {
-  if (op.lines === undefined || typeof result !== "object" || result === null) return Output.json(result)
-  const { [op.lines]: items, ...rest } = result as Record<string, unknown>
-  return Output.lines([...(Array.isArray(items) ? items : []), rest])
-}
+/** JSON Lines ops print the lines their published `lines` schemas describe; the rest print one value. */
+const print = (op: AnyOperation, result: unknown) =>
+  op.lines === undefined || typeof result !== "object" || result === null
+    ? Output.json(result)
+    : Output.lines(toLines(op.lines, result as Record<string, unknown>))
 
 const opCommand = (op: AnyOperation) => {
   const fields = fieldsFor(op)
@@ -47,7 +55,15 @@ const opCommand = (op: AnyOperation) => {
       const result = yield* execute(op, raw).pipe(Effect.provide(kymoLayer({ out })))
       yield* print(op, result)
     })
-  ).pipe(Command.withDescription(`${op.description} Images: ${op.cost}.`))
+  ).pipe(
+    Command.withDescription(
+      `${op.description} Images: ${op.cost}.${
+        op.lines === undefined
+          ? ""
+          : ` Prints JSON Lines: one of ${op.lines.field} per line, then a summary line (\`kymo schema ${op.name}\` → lines).`
+      }`
+    )
+  )
 }
 
 const schemaCommand = Command.make(
@@ -61,7 +77,10 @@ const schemaCommand = Command.make(
   },
   ({ command }) =>
     Effect.gen(function* () {
-      const io = (op: AnyOperation) => ({ input: jsonSchema(op.input), output: jsonSchema(op.output) })
+      const io = (op: AnyOperation) => {
+        const { name: _name, description: _description, ...schemas } = schemasOf(op)
+        return schemas
+      }
       if (Option.isNone(command))
         return yield* Output.json(Object.fromEntries(operations.map((op) => [op.name, io(op)])))
       const op = operations.find((o) => o.name === command.value)

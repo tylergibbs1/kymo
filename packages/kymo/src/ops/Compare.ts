@@ -7,7 +7,7 @@ import { Effect, Schema } from "effect"
 import { Addresses, Cursor, Format, Source, SteppedRange, TargetInput, Uncapped } from "../Fields.ts"
 import { resolveAddresses, resolveSpan } from "../Frames.ts"
 import { FrameLabels } from "../FrameLabels.ts"
-import { define } from "../Operation.ts"
+import { define, jsonLines } from "../Operation.ts"
 import { OutputDir } from "../OutputDir.ts"
 import { Sheet, SheetFrame, toSheets } from "../Sheets.ts"
 
@@ -80,7 +80,7 @@ export const compare = define({
   output: CompareOutput,
   readOnly: true,
   images: (output) => output.sheets,
-  lines: "sheets",
+  lines: jsonLines(CompareOutput, "sheets"),
   run: Effect.fn("kymo.compare")(function* (input: typeof CompareInput.Type) {
     const workspace = yield* Workspace
     const output = yield* OutputDir

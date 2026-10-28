@@ -110,5 +110,7 @@ export const checkResult = (findings: ReadonlyArray<CheckFinding>) =>
     rules: ["flicker"],
     findings,
     assertions: [],
-    pass: false
+    pass: false,
+    counts: { error: findings.length, warning: 0, info: 0 },
+    label: `Fail: 0 warnings, ${findings.length} errors, 0 info; no assertions.`
   })

@@ -311,6 +311,22 @@ describe("check", () => {
     }).pipe(Effect.provide(fresh))
   )
 
+  it.effect("counts findings by severity and says so next to pass", () =>
+    Effect.gen(function* () {
+      const out = yield* call(check, {
+        source: "synthetic:dropped?dups=5,50,51,52",
+        rules: ["duplicate-frames"],
+        assert: ["motion >= 0"]
+      })
+      expect(out.pass).toBe(true)
+      expect(out.counts).toEqual({ error: 0, warning: 2, info: 0 })
+      expect(out.label).toBe("Pass with 2 warnings, 0 errors, 0 info; 1 of 1 assertions passed.")
+      const failed = yield* call(check, { source: "synthetic:flicker?at=40&gain=120", rules: ["flicker"] })
+      expect(failed.counts.error).toBe(1)
+      expect(failed.label).toBe("Fail: 0 warnings, 1 error, 0 info; no assertions.")
+    }).pipe(Effect.provide(fresh))
+  )
+
   it.effect("evaluates assertions over source tracks, motion and markers", () =>
     Effect.gen(function* () {
       const out = yield* call(check, {

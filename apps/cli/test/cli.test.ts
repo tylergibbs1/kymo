@@ -2,6 +2,8 @@ import { execFileSync, spawn } from "node:child_process"
 import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
+import { jsonSchema, operations } from "kymo"
+import { Schema } from "effect"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
 const BIN = resolve(import.meta.dirname, "../bin/kymo.js")
@@ -146,6 +148,32 @@ describe("kymo CLI", () => {
     expect(lines.at(-1)).toMatchObject({ rules: ["flicker", "black-frames"], pass: false })
   })
 
+  /** One input per JSON Lines command; a new JSON Lines command fails the test below until it has one. */
+  const LINES_INPUTS: Readonly<Record<string, Record<string, unknown>>> = {
+    frames: { source: "synthetic:bounce?impact=20", range: "0f..-1f:3f", target: "standard" },
+    compare: { a: "synthetic:ease?easing=linear", b: "synthetic:ease?easing=ease-out", at: ["0f", "1s"] },
+    check: { source: "synthetic:dropped?dups=5,50,51,52", assert: ["motion >= 0"] }
+  }
+
+  it("every JSON Lines command prints lines that decode with the line and summary schemas it publishes", async () => {
+    const streamed = operations.filter((op) => op.lines !== undefined)
+    expect(streamed.map((op) => op.name).sort()).toEqual(Object.keys(LINES_INPUTS).sort())
+    const strict = { onExcessProperty: "error" } as const
+    for (const op of streamed) {
+      const { field, line, summary } = op.lines!
+      const published = JSON.parse((await kymo("schema", op.name)).stdout) as Record<string, unknown>
+      expect(published["lines"]).toEqual({ field, line: jsonSchema(line), summary: jsonSchema(summary) })
+      const json = JSON.stringify(LINES_INPUTS[op.name])
+      const r = await kymo(op.name, "--json", json, "--out", join(dir, "lines"))
+      expect(r.code, r.stderr).toBe(0)
+      const lines = jsonLines(r.stdout)
+      expect(lines.length, op.name).toBeGreaterThan(1)
+      for (const l of lines.slice(0, -1))
+        expect(() => Schema.decodeUnknownSync(line)(l, strict)).not.toThrow()
+      expect(() => Schema.decodeUnknownSync(summary)(lines.at(-1), strict)).not.toThrow()
+    }
+  })
+
   it("record is unavailable with its own exit code", async () => {
     const r = await kymo("record", "screen", "--duration", "5s")
     expect(r.code).toBe(4)
@@ -174,6 +202,8 @@ describe("kymo CLI", () => {
       expect(output["type"]).toBe("object")
     }
     const one = JSON.parse((await kymo("schema", "frames")).stdout) as Record<string, unknown>
-    expect(Object.keys(one)).toEqual(["input", "output"])
+    expect(Object.keys(one)).toEqual(["input", "output", "lines"])
+    const plain = JSON.parse((await kymo("schema", "probe")).stdout) as Record<string, unknown>
+    expect(Object.keys(plain)).toEqual(["input", "output"])
   })
 })

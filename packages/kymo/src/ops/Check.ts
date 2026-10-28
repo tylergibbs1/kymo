@@ -4,6 +4,7 @@ import {
   type FrameRange,
   type RegionTrack,
   RuleName,
+  type Severity,
   check as runCheck,
   detectCuts,
   frameRef,
@@ -16,7 +17,7 @@ import { Workspace } from "@kymo/sources"
 import { Effect, Schema } from "effect"
 import { Range, Source as SourceField } from "../Fields.ts"
 import { analysisRange } from "../Frames.ts"
-import { define } from "../Operation.ts"
+import { define, jsonLines } from "../Operation.ts"
 
 export const CheckInput = Schema.Struct({
   source: SourceField,
@@ -57,8 +58,33 @@ export const CheckOutput = Schema.Struct({
   assertions: Schema.Array(AssertionResult),
   pass: Schema.Boolean.annotate({
     description: "True when every assertion passed and no finding is an error. Warnings do not fail a check."
+  }),
+  counts: Schema.Struct({ error: Schema.Int, warning: Schema.Int, info: Schema.Int }).annotate({
+    description: "Findings by severity. pass can be true with warnings; read these too."
+  }),
+  label: Schema.String.annotate({
+    description:
+      'One line for people and agents, e.g. "Pass with 2 warnings, 0 errors, 0 info; 3 of 3 assertions passed."'
   })
 }).annotate({ identifier: "CheckOutput" })
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 || word === "info" ? "" : "s"}`
+
+/** pass, counts and label from the same findings and assertions, so they always agree. */
+const verdict = (
+  findings: ReadonlyArray<{ readonly severity: Severity }>,
+  assertions: ReadonlyArray<AssertionResult>
+) => {
+  const counts = { error: 0, warning: 0, info: 0 }
+  for (const f of findings) counts[f.severity]++
+  const passed = assertions.filter((a) => a.pass).length
+  const pass = counts.error === 0 && passed === assertions.length
+  const severities = `${plural(counts.warning, "warning")}, ${plural(counts.error, "error")}, ${plural(counts.info, "info")}`
+  const asserted =
+    assertions.length === 0 ? "no assertions" : `${passed} of ${assertions.length} assertions passed`
+  const head = pass ? (counts.warning + counts.info > 0 ? "Pass with " : "Pass: ") : "Fail: "
+  return { pass, counts, label: `${head}${severities}; ${asserted}.` }
+}
 
 /**
  * A source's ground-truth `box.*` tracks laid out as a tracked region, so safe-area can run on
@@ -100,7 +126,7 @@ export const check = define({
   input: CheckInput,
   output: CheckOutput,
   readOnly: true,
-  lines: "findings",
+  lines: jsonLines(CheckOutput, "findings"),
   run: Effect.fn("kymo.check")(function* (input: typeof CheckInput.Type) {
     const workspace = yield* Workspace
     const source = yield* workspace.open(input.source)
@@ -145,7 +171,7 @@ export const check = define({
       rules: report.rules,
       findings,
       assertions,
-      pass: assertions.every((a) => a.pass) && findings.every((f) => f.severity !== "error")
+      ...verdict(findings, assertions)
     }
   }, Effect.scoped)
 })

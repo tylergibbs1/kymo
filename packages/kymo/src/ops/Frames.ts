@@ -33,7 +33,7 @@ import {
 } from "../Fields.ts"
 import { checkSyntax, resolveAddresses, resolveSpan } from "../Frames.ts"
 import { FrameLabels } from "../FrameLabels.ts"
-import { define } from "../Operation.ts"
+import { define, jsonLines } from "../Operation.ts"
 import { OutputDir } from "../OutputDir.ts"
 import { Sheet, SheetFrame, sheetOf, toSheets } from "../Sheets.ts"
 
@@ -190,7 +190,7 @@ export const frames = define({
   output: FramesOutput,
   readOnly: true,
   images: (output) => output.sheets,
-  lines: "sheets",
+  lines: jsonLines(FramesOutput, "sheets"),
   run: Effect.fn("kymo.frames")(function* (input: FramesInput) {
     if (input.view === "follow" && input.box === undefined)
       return yield* invalid(
