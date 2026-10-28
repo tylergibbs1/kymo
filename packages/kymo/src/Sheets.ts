@@ -27,6 +27,12 @@ export const Sheet = Schema.Struct({
   tokens: Schema.optionalKey(
     Schema.Int.annotate({ description: "Detailed only: the image's cost in visual tokens." })
   ),
+  bytes: Schema.optionalKey(
+    Schema.Int.annotate({
+      description:
+        "Detailed only: the file's size. Never above the target's maxBytes (default 3.75 MB, 5 MB as base64)."
+    })
+  ),
   frames: Schema.Array(SheetFrame)
 })
 export type Sheet = typeof Sheet.Type
@@ -43,17 +49,26 @@ const spanText = (
   return first === last ? one(first) : `${one(first)}–${one(last)}`
 }
 
-/** `12 frames, every 20f`, `12 frames, uneven spacing`, `1 frame`. */
+/**
+ * `1 frame`, `2 frames, 52s04f apart`, `12 frames, consecutive`, `12 frames, every 20f`,
+ * `12 frames, about every 3s14f` (gaps within a frame of each other, as even sampling leaves them),
+ * `12 frames, uneven spacing`. Gaps are frame counts, so they are written as lengths.
+ */
 export const frameCountText = (timeline: Timeline, indices: ReadonlyArray<number>): string => {
   if (indices.length === 1) return "1 frame"
-  const gaps = new Set(indices.slice(1).map((i, k) => i - indices[k]!))
-  const [gap] = [...gaps]
+  const gaps = indices.slice(1).map((i, k) => i - indices[k]!)
+  const length = (frames: number) => Address.formatLength(timeline.rate, frames)
+  if (gaps.length === 1) return `2 frames, ${length(gaps[0]!)} apart`
+  const least = Math.min(...gaps)
+  const most = Math.max(...gaps)
   const spacing =
-    gaps.size === 1 && gap !== undefined
-      ? gap === 1
-        ? "consecutive"
-        : `every ${Address.format(timeline.rate, gap)}`
-      : "uneven spacing"
+    most === 1
+      ? "consecutive"
+      : least === most
+        ? `every ${length(least)}`
+        : most - least <= 1
+          ? `about every ${length(Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length))}`
+          : "uneven spacing"
   return `${indices.length} frames, ${spacing}`
 }
 
@@ -63,16 +78,16 @@ export interface LabelContext {
   readonly who: string
   /** Shown after `who` when it is not a plain sheet: `diff`, `onion`, `follow 120,80,64,64`. */
   readonly view?: string
-  /** Whether more sheets follow (a `next` cursor). */
-  readonly more: boolean
+  /** Unused: each image carries its own `sheet` of `sheets`. Kept so existing callers still compile. */
+  readonly more?: boolean
   readonly format: Format
   readonly labelStyle: Address.LabelStyle
 }
 
-/** A view's PNGs as labelled sheets. */
+/** A view's PNGs as labelled sheets, numbered across cursors: `Sheet 5 of 7`. */
 export const toSheets = (images: ReadonlyArray<ViewImage>, ctx: LabelContext): Array<Sheet> =>
-  images.map((image, k) => {
-    const of = `Sheet ${k + 1} of ${images.length}${ctx.more ? "+" : ""}`
+  images.map((image) => {
+    const of = `Sheet ${image.sheet} of ${image.sheets}`
     const parts = [of, ctx.who, ...(ctx.view ? [ctx.view] : [])]
     const label = [
       ...parts,
@@ -92,7 +107,9 @@ export const sheetOf = (image: ViewImage, label: string, format: Format): Sheet 
     label,
     span: basename(image.path, ".png"),
     path: image.path,
-    ...(detailed ? { width: image.width, height: image.height, tokens: image.tokens } : {}),
+    ...(detailed
+      ? { width: image.width, height: image.height, tokens: image.tokens, bytes: image.bytes }
+      : {}),
     frames: image.frames.map((f) =>
       detailed ? { address: f.address, index: f.index, t: f.t } : { address: f.address, index: f.index }
     )

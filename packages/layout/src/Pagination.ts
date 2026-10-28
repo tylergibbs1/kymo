@@ -41,6 +41,10 @@ export interface Pages {
   readonly pages: ReadonlyArray<Page>
   /** Set when items remain after these pages. */
   readonly next: Cursor | undefined
+  /** 1-based number of `pages[0]` among every sheet of the request, across all its cursors. */
+  readonly first: number
+  /** Sheets the whole request takes, across all its cursors. */
+  readonly total: number
 }
 
 export interface PaginateRequest extends Omit<GridRequest, "count" | "columns"> {
@@ -106,19 +110,51 @@ export const paginate = (req: PaginateRequest): Result.Result<Pages, InvalidInpu
       })
     )
   return Result.flatMap(sheetCapacity(req), (capacity) => {
-    const remaining = req.items - offset
-    const sheets = Math.ceil(remaining / capacity)
-    const base = Math.floor(remaining / sheets)
-    const extra = remaining % sheets
     const pages: Array<Page> = []
-    let at = offset
-    for (let i = 0; i < Math.min(sheets, maxSheets); i++) {
-      const count = base + (i < extra ? 1 : 0)
+    for (const { offset: at, count } of callFrom(req.items, capacity, maxSheets, offset)) {
       const plan = planGrid(gridFor(req, count))
       if (Result.isFailure(plan)) return Result.fail(plan.failure)
       pages.push({ offset: at, count, plan: plan.success })
-      at += count
     }
-    return Result.succeed({ pages, next: at < req.items ? encodeCursor(at) : undefined })
+    const end = offset + pages.reduce((n, p) => n + p.count, 0)
+    // Replay the calls before and after this one, so sheet numbers run on across cursors.
+    const sheetsBetween = (from: number, to: number) => {
+      let n = 0
+      for (let at = from; at < to;) {
+        const call = callFrom(req.items, capacity, maxSheets, at)
+        n += call.length
+        at = call[call.length - 1]!.offset + call[call.length - 1]!.count
+      }
+      return n
+    }
+    const before = sheetsBetween(0, offset)
+    const after = sheetsBetween(end, req.items)
+    return Result.succeed({
+      pages,
+      next: end < req.items ? encodeCursor(end) : undefined,
+      first: before + 1,
+      total: before + pages.length + after
+    })
   })
+}
+
+/** The pages one call draws from `offset`: the rest split into balanced sheets, at most `maxSheets`. */
+const callFrom = (
+  items: number,
+  capacity: number,
+  maxSheets: number,
+  offset: number
+): Array<{ readonly offset: number; readonly count: number }> => {
+  const remaining = items - offset
+  const sheets = Math.ceil(remaining / capacity)
+  const base = Math.floor(remaining / sheets)
+  const extra = remaining % sheets
+  const out: Array<{ offset: number; count: number }> = []
+  let at = offset
+  for (let i = 0; i < Math.min(sheets, maxSheets); i++) {
+    const count = base + (i < extra ? 1 : 0)
+    out.push({ offset: at, count })
+    at += count
+  }
+  return out
 }

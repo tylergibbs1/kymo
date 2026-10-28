@@ -143,7 +143,12 @@ describe("frames", () => {
     Effect.gen(function* () {
       const first = yield* call(frames, { source: BOUNCE, range: "0f..-1f", target: "standard" })
       expect(first.sheets).toHaveLength(4)
-      expect(first.sheets[0]!.label).toMatch(/^Sheet 1 of 4\+ · clip1 · /)
+      expect(first.sheets.map((s) => s.label.split(" · ")[0])).toEqual([
+        "Sheet 1 of 8",
+        "Sheet 2 of 8",
+        "Sheet 3 of 8",
+        "Sheet 4 of 8"
+      ])
       expect(first.next).not.toBeNull()
       expect(first.note).toMatch(/^Showing \d+ of 90 frames\. Pass cursor=/)
       const rest = yield* call(frames, {
@@ -154,6 +159,12 @@ describe("frames", () => {
       })
       const seen = [...first.sheets, ...rest.sheets].flatMap((s) => s.frames.map((f) => f.index))
       expect(seen.length).toBeGreaterThan(first.sheets.flatMap((s) => s.frames).length)
+      expect(rest.sheets.map((s) => s.label.split(" · ")[0])).toEqual([
+        "Sheet 5 of 8",
+        "Sheet 6 of 8",
+        "Sheet 7 of 8",
+        "Sheet 8 of 8"
+      ])
     }).pipe(Effect.provide(fresh))
   )
 
@@ -161,6 +172,8 @@ describe("frames", () => {
     Effect.gen(function* () {
       const capped = yield* failure(frames, { source: "synthetic:bounce?frames=150", range: "0f..-1f" })
       expect(capped._tag).toBe("FrameCapExceeded")
+      expect(capped.hint).toContain("range=0f..04s29f:2f")
+      expect(capped.hint).not.toContain("sample=")
       const noBox = yield* failure(frames, { source: BOUNCE, at: ["0f"], view: "follow" })
       expect(noBox.hint).toContain("box=")
       const followed = yield* call(frames, {

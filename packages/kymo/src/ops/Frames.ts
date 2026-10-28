@@ -7,6 +7,7 @@ import {
   type KymoError,
   Marker,
   type Source,
+  capStep,
   enforceFrameCap,
   secondsAt
 } from "@kymo/core"
@@ -215,7 +216,14 @@ export const frames = define({
     const { timeline } = source
     const indices =
       "at" in input ? yield* resolveAddresses(timeline, input.at) : yield* resolveSpan(timeline, input.range)
-    yield* enforceFrameCap(indices.length, input.uncapped)
+    yield* enforceFrameCap(
+      indices.length,
+      input.uncapped,
+      `Thin it with a step, e.g. range=${Address.format(timeline.rate, indices[0]!)}..${Address.format(timeline.rate, indices[indices.length - 1]!)}:${capStep(indices.length)}f, or pass fewer addresses.`
+    )
+    // A diff shows each frame against the one before; the first frame has none, so it is skipped.
+    const skipFirst = input.view === "diff" && indices[0] === 0 && indices.length > 1
+    const drawn = skipFirst ? indices.slice(1) : indices
     const draw: Draw = {
       source,
       outDir: yield* output.dirFor(timeline.handle),
@@ -225,8 +233,9 @@ export const frames = define({
       labelStyle: style
     }
     const result = input.separate
-      ? yield* drawSeparate(draw, indices, input.cursor)
-      : yield* drawView(draw, indices, input.cursor)
+      ? yield* drawSeparate(draw, drawn, input.cursor)
+      : yield* drawView(draw, drawn, input.cursor)
+    const offset = input.cursor === undefined ? 0 : cursorOffset(input.cursor)
     const detailed = input.format === "detailed"
     const refs = indices.map((index) => {
       const address = Address.format(timeline.rate, index)
@@ -239,7 +248,7 @@ export const frames = define({
           sheetOf(
             image,
             [
-              `Frame ${k + 1} of ${result.images.length}${result.next === null ? "" : "+"}`,
+              `Frame ${offset + k + 1} of ${drawn.length}`,
               timeline.handle,
               ...(viewLabelText ? [viewLabelText] : []),
               Address.styledLabel(timeline.rate, image.frames[0]!.index, style)
@@ -251,13 +260,24 @@ export const frames = define({
           timeline,
           who: timeline.handle,
           ...(viewLabelText ? { view: viewLabelText } : {}),
-          more: result.next !== null,
           format: input.format,
           labelStyle: style
         })
     const tracks = detailed ? yield* Effect.forEach(timeline.tracks, (t) => source.track(t.name)) : []
     const first = indices[0]!
     const last = indices[indices.length - 1]!
+    const notes = [
+      ...(skipFirst
+        ? [
+            `0f has no previous frame to diff against, so the diff starts at ${Address.format(timeline.rate, drawn[0]!)}.`
+          ]
+        : []),
+      ...(result.next === null
+        ? []
+        : [
+            `Showing ${shown} of ${drawn.length} frames. Pass cursor=${result.next} for the rest, or thin the request with a step like range=${Address.format(timeline.rate, first)}..${Address.format(timeline.rate, last)}:${Math.max(2, Math.ceil(indices.length / (DEFAULT_MAX_SHEETS * MAX_PER_SHEET)))}f.`
+          ])
+    ]
     return {
       handle: timeline.handle,
       view: input.view,
@@ -277,11 +297,7 @@ export const frames = define({
           }
         : {}),
       next: result.next,
-      ...(result.next === null
-        ? {}
-        : {
-            note: `Showing ${shown} of ${indices.length} frames. Pass cursor=${result.next} for the rest, or thin the request with a step like range=${Address.format(timeline.rate, first)}..${Address.format(timeline.rate, last)}:${Math.max(2, Math.ceil(indices.length / (DEFAULT_MAX_SHEETS * MAX_PER_SHEET)))}f.`
-          })
+      ...(notes.length > 0 ? { note: notes.join(" ") } : {})
     }
   }, Effect.scoped)
 })
