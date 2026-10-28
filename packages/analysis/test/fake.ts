@@ -3,6 +3,7 @@ import {
   type DecodedFrame,
   InvalidInput,
   type Marker,
+  type ReadOptions,
   RgbImage,
   type Source,
   type Timeline,
@@ -22,7 +23,8 @@ export interface Scene {
   readonly background: Rgb
   /** Deterministic per-pixel noise amplitude on the background, so shots have distinct histograms. */
   readonly texture?: number
-  readonly rects?: ReadonlyArray<{ x: number; y: number; w: number; h: number; rgb: Rgb }>
+  /** Drawn in order; `alpha` (default 1) blends a rectangle over what is under it, as a fade does. */
+  readonly rects?: ReadonlyArray<{ x: number; y: number; w: number; h: number; rgb: Rgb; alpha?: number }>
 }
 
 const hash = (x: number, y: number) => {
@@ -31,28 +33,31 @@ const hash = (x: number, y: number) => {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296
 }
 
-export const draw = (scene: Scene): RgbImage => {
-  const img = RgbImage.blank(W, H, scene.background)
+export const draw = (scene: Scene, width = W, height = H): RgbImage => {
+  const img = RgbImage.blank(width, height, scene.background)
   const d = img.data
   const amp = scene.texture ?? 0
   if (amp > 0) {
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
         const n = (hash(x, y) - 0.5) * 2 * amp
         for (let c = 0; c < 3; c++) {
-          const p = (y * W + x) * 3 + c
+          const p = (y * width + x) * 3 + c
           d[p] = Math.max(0, Math.min(255, d[p]! + n))
         }
       }
     }
   }
+  // A rectangle may sit on fractional pixels: an edge pixel is blended by how much of it is covered,
+  // as a browser anti-aliases a transformed layer.
+  const cover = (lo: number, hi: number, p: number) => Math.max(0, Math.min(hi, p + 1) - Math.max(lo, p))
   for (const r of scene.rects ?? []) {
-    for (let y = Math.max(0, r.y); y < Math.min(H, r.y + r.h); y++) {
-      for (let x = Math.max(0, r.x); x < Math.min(W, r.x + r.w); x++) {
-        const p = (y * W + x) * 3
-        d[p] = r.rgb[0]
-        d[p + 1] = r.rgb[1]
-        d[p + 2] = r.rgb[2]
+    const a = r.alpha ?? 1
+    for (let y = Math.max(0, Math.floor(r.y)); y < Math.min(height, Math.ceil(r.y + r.h)); y++) {
+      for (let x = Math.max(0, Math.floor(r.x)); x < Math.min(width, Math.ceil(r.x + r.w)); x++) {
+        const k = a * cover(r.x, r.x + r.w, x) * cover(r.y, r.y + r.h, y)
+        const p = (y * width + x) * 3
+        for (let c = 0; c < 3; c++) d[p + c] = Math.round(k * r.rgb[c]! + (1 - k) * d[p + c]!)
       }
     }
   }
@@ -60,13 +65,20 @@ export const draw = (scene: Scene): RgbImage => {
 }
 
 /** A textured square: SAD has something to lock on to. */
-export const texturedSquare = (x: number, y: number, size: number): NonNullable<Scene["rects"]> => {
-  const out: Array<{ x: number; y: number; w: number; h: number; rgb: Rgb }> = []
+export const texturedSquare = (
+  x: number,
+  y: number,
+  size: number,
+  alpha = 1
+): NonNullable<Scene["rects"]> => {
+  // Four quadrants that do not overlap, so `alpha` fades the square as one layer, as a browser does.
   const half = size / 2
-  out.push({ x, y, w: size, h: size, rgb: [230, 230, 230] })
-  out.push({ x, y, w: half, h: half, rgb: [40, 160, 220] })
-  out.push({ x: x + half, y: y + half, w: half, h: half, rgb: [220, 60, 40] })
-  return out
+  return [
+    { x, y, w: half, h: half, rgb: [40, 160, 220], alpha },
+    { x: x + half, y, w: half, h: half, rgb: [230, 230, 230], alpha },
+    { x, y: y + half, w: half, h: half, rgb: [230, 230, 230], alpha },
+    { x: x + half, y: y + half, w: half, h: half, rgb: [220, 60, 40], alpha }
+  ]
 }
 
 export interface FakeOptions {
@@ -76,6 +88,8 @@ export interface FakeOptions {
   readonly tracks?: ReadonlyArray<Track>
   readonly markers?: ReadonlyArray<Marker>
   readonly size?: { width: number; height: number } | null
+  /** Told every read, e.g. to check what resolution a caller decodes at. */
+  readonly onRead?: (indices: ReadonlyArray<number>, options: ReadOptions | undefined) => void
 }
 
 /** A Source whose frames are drawn on demand: nothing is held in memory. */
@@ -100,14 +114,17 @@ export const fakeSource = (options: FakeOptions): Source => {
   }
   return {
     timeline,
-    readFrames: (indices) =>
-      Stream.fromIterable(indices).pipe(
+    readFrames: (indices, readOptions) => {
+      options.onRead?.(indices, readOptions)
+      const { width, height } = timeline.size ?? { width: W, height: H }
+      return Stream.fromIterable(indices).pipe(
         Stream.map((index): DecodedFrame => ({
           index,
           t: secondsAt(r, index),
-          image: draw(options.scene(index))
+          image: draw(options.scene(index), width, height)
         }))
-      ),
+      )
+    },
     track: (name) => {
       const t = tracks.find((x) => x.name === name)
       return t

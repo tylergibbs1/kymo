@@ -13,11 +13,12 @@ export const exampleBox = (size: Size): string =>
 export const findBoxHint = (source: Source, range: FrameRange): string =>
   `find it with kymo frames ${source.timeline.handle} --at ${Address.format(range.rate, range.first)} --view grid`
 
-/** Follow `box` (source pixels, as it is at the range's first frame) through the range. */
+/** Follow `box` (source pixels, as it is at `anchor`, default the range's first frame) through the range. */
 export const measureBox = (
   source: Source,
   range: FrameRange,
-  box: string
+  box: string,
+  anchor: number = range.first
 ): Effect.Effect<RegionTrack, KymoError> =>
   Effect.gen(function* () {
     const { timeline } = source
@@ -28,5 +29,7 @@ export const measureBox = (
           hint: "Drop box and use the source's own tracks."
         })
       )
-    return yield* trackRegion(source, range, yield* Effect.fromResult(parseBox(box, timeline.size)))
+    return yield* trackRegion(source, range, yield* Effect.fromResult(parseBox(box, timeline.size)), {
+      anchor
+    })
   })

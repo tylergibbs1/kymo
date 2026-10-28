@@ -1,6 +1,16 @@
-import { FrameRef, InvalidInput, type KymoError, type Size, type Source, Track } from "@kymo/core"
+import {
+  type FrameIndex,
+  FrameRef,
+  InvalidInput,
+  type KymoError,
+  type Size,
+  type Source,
+  Track,
+  frameIndex
+} from "@kymo/core"
 import { Effect, Result, Schema, Stream } from "effect"
-import { type Gray, toGray } from "./Pixels.ts"
+import { type Pose, type Template, cutTemplate, score, search } from "./Match.ts"
+import { type Plane, planeOf, pyramid } from "./Plane.ts"
 import type { FrameRange } from "./Range.ts"
 import { round } from "./Stats.ts"
 
@@ -33,8 +43,12 @@ export const parseBox = (text: string, size: Size): Result.Result<Box, InvalidIn
   return Result.succeed({ x, y, w, h })
 }
 
-/** Why a run of frames has no position: the match was poor, or the box ran into the frame edge. */
-export const LostReason = Schema.Literals(["low-confidence", "edge"])
+/**
+ * Why a run of frames has no position. `low-confidence`: something is there but it does not match
+ * the subject. `edge`: the subject is (almost) entirely outside the frame. `faded`: nothing with the
+ * subject's structure is where it was, as when it fades out or is hidden.
+ */
+export const LostReason = Schema.Literals(["low-confidence", "edge", "faded"])
 export type LostReason = typeof LostReason.Type
 
 /** Consecutive frames where the region was lost, for the same reason as its first frame. */
@@ -51,8 +65,11 @@ export const RegionTrack = Schema.Struct({
   method: Schema.Literals(["template", "selector"]),
   from: FrameRef,
   to: FrameRef,
+  /** The frame the box was given at; tracking runs forwards and backwards from it. */
+  anchor: Schema.optionalKey(FrameRef),
   x: Track,
   y: Track,
+  /** Measured: the box scales with the subject (about its centre). */
   w: Track,
   h: Track,
   /** Match quality per frame, 0..1. Position samples are null where the region was lost. */
@@ -65,158 +82,159 @@ export type RegionTrack = typeof RegionTrack.Type
 export interface TrackOptions {
   /** Track prefix. Default `box`. */
   readonly name?: string
-  /** Long edge to decode at; smaller is faster, larger is more precise. Default 480. */
+  /** Long edge to decode at. Default: chosen from the box size, so cost does not grow with the box. */
   readonly maxEdge?: number
+  /** The frame `box` describes, inside `range`. Default `range.first`. */
+  readonly anchor?: number
 }
 
-/** Below this match quality the region counts as lost for that frame. */
+/** Below this match quality (ZNCC) the region counts as lost for that frame. */
 const LOST = 0.5
-/**
- * A template whose pixels vary less than this (variance in grey levels², i.e. a 3-level standard
- * deviation) is flat: what structure it has is resampling ripple, which correlates as noise.
- */
-const FLAT_VARIANCE = 9
-/** A flat region closer than this (0..255) to its surroundings cannot be told apart from them. */
-const MIN_CONTRAST = 8
-/** At or above this, the template is refreshed from the new match. */
-const REFRESH = 0.8
+/** After a loss, a match must be at least this good to pick the region up again. */
+const RECOVER = 0.6
+/** A match further than `Model.near` from the predicted position must be at least this good. */
+const JUMP = 0.8
+/** Less of the template than this inside the frame cannot be matched. */
+const MIN_VISIBLE = 0.12
+/** A lost subject with less than this much of its template inside the frame has left it. */
+const EDGE_VISIBLE = 0.5
+/** A lost subject whose spot shows less than this fraction of its contrast has faded out. */
+const FADED_CONTRAST = 0.2
+/** Scale is fitted only while this much of the template is inside the frame. */
+const SCALE_VISIBLE = 0.95
+/** The box's long edge at the working resolution: enough for sub-pixel precision, cheap to search. */
+const WORK_EDGE = 192
+/** The coarsest search level keeps the template's short side at least this many pixels. */
+const COARSE_SIDE = 8
+/** A template whose variance (grey levels², per pixel) is below this is flat: it is matched with a margin of its surroundings, so its edges carry the match. */
+const FLAT_TEMPLATE = 9
+/** Working pixels of surroundings kept around the box in the template. */
+const MARGIN = 2
+/** Frames decoded at once when tracking backwards. */
+const BACKWARD_CHUNK = 32
 
-interface Patch {
-  readonly w: number
-  readonly h: number
-  readonly data: Float32Array
-}
-
-const cut = (g: Gray, x: number, y: number, w: number, h: number): Patch => {
-  const data = new Float32Array(w * h)
-  for (let r = 0; r < h; r++) {
-    for (let c = 0; c < w; c++) data[r * w + c] = g.data[(y + r) * g.width + x + c]!
-  }
-  return { w, h, data }
-}
-
-/** Sum of absolute differences, or Infinity as soon as it exceeds `limit` (so a cut-short sum never wins). */
-const sad = (g: Gray, t: Patch, x: number, y: number, limit: number): number => {
-  let s = 0
-  for (let r = 0; r < t.h; r++) {
-    const row = (y + r) * g.width + x
-    for (let c = 0; c < t.w; c++) s += Math.abs(g.data[row + c]! - t.data[r * t.w + c]!)
-    if (s > limit) return Infinity
-  }
-  return s
-}
-
-/** Mean of the ring `width` px wide just outside a w×h patch at (x, y), clipped to the frame. */
-const ringMean = (g: Gray, x: number, y: number, w: number, h: number, width = 2): number => {
-  let sum = 0
-  let n = 0
-  for (let r = Math.max(0, y - width); r < Math.min(g.height, y + h + width); r++) {
-    for (let c = Math.max(0, x - width); c < Math.min(g.width, x + w + width); c++) {
-      if (r >= y && r < y + h && c >= x && c < x + w) continue
-      sum += g.data[r * g.width + c]!
-      n++
-    }
-  }
-  return n === 0 ? Number.NaN : sum / n
-}
-
-/**
- * Match quality, 0..1: normalised cross-correlation of template `a` and `patch`. A flat template
- * (a plain square) has no structure to correlate, so it scores by its mean difference relative to
- * its contrast with the surroundings `ring`: soft, sub-pixel edges cost little, bare background
- * scores 0.
- */
-const quality = (a: Patch, b: Patch, ring: number): number => {
-  const n = a.data.length
-  let ma = 0
-  let mb = 0
-  for (let i = 0; i < n; i++) {
-    ma += a.data[i]!
-    mb += b.data[i]!
-  }
-  ma /= n
-  mb /= n
-  let num = 0
-  let da = 0
-  let db = 0
-  let diff = 0
-  for (let i = 0; i < n; i++) {
-    const x = a.data[i]! - ma
-    const y = b.data[i]! - mb
-    num += x * y
-    da += x * x
-    db += y * y
-    diff += Math.abs(a.data[i]! - b.data[i]!)
-  }
-  if (da >= FLAT_VARIANCE * n && db > 0) return Math.max(0, num / Math.sqrt(da * db))
-  const contrast = Number.isNaN(ring) ? 255 : Math.abs(ma - ring)
-  return contrast < MIN_CONTRAST ? 0 : Math.max(0, 1 - diff / n / contrast)
-}
-
-/** Offset of a parabola's vertex through (-1, a), (0, b), (1, c), in -0.5..0.5. */
-const vertex = (a: number, b: number, c: number): number => {
-  const d = a - 2 * b + c
-  return d <= 0 ? 0 : Math.max(-0.5, Math.min(0.5, (a - c) / (2 * d)))
+interface Model {
+  readonly templates: ReadonlyArray<Template>
+  readonly levels: number
+  /** Working pixels per source pixel. */
+  readonly sx: number
+  readonly sy: number
+  /** Search radius around the last position, level-0 pixels. */
+  readonly radius: number
+  /** How far (level-0 pixels) a match may land from the prediction and still count as expected. */
+  readonly near: number
 }
 
 interface State {
-  template: Patch
-  readonly original: Patch
-  x: number
-  y: number
+  pose: Pose
   vx: number
   vy: number
-  radius: number
+  /** Frames since the last match; 0 while matched. */
+  missed: number
+  /** Why the current run of misses began; a run keeps the reason of its first frame. */
+  reason: LostReason | undefined
 }
 
-const match = (g: Gray, s: State, baseRadius: number) => {
-  const { template: t } = s
-  const maxX = g.width - t.w
-  const maxY = g.height - t.h
-  // Search around the last position, widened by the current speed, so continuing, stopping and
-  // reversing (a bounce) all stay inside the window. The constant-velocity prediction only breaks ties.
-  const px = Math.round(s.x + s.vx)
-  const py = Math.round(s.y + s.vy)
-  const rx = s.radius + Math.ceil(Math.abs(s.vx))
-  const ry = s.radius + Math.ceil(Math.abs(s.vy))
-  let best = Infinity
-  let bx = Math.max(0, Math.min(maxX, px))
-  let by = Math.max(0, Math.min(maxY, py))
-  for (let y = Math.max(0, s.y - ry); y <= Math.min(maxY, s.y + ry); y++) {
-    for (let x = Math.max(0, s.x - rx); x <= Math.min(maxX, s.x + rx); x++) {
-      const v = sad(g, t, x, y, best)
-      if (v < best || (v === best && Math.hypot(x - px, y - py) < Math.hypot(bx - px, by - py))) {
-        best = v
-        bx = x
-        by = y
-      }
-    }
+type Step =
+  | { readonly _tag: "found"; readonly pose: Pose; readonly q: number }
+  | { readonly _tag: "lost"; readonly q: number; readonly reason: LostReason }
+
+const step = (model: Model, state: State, levels: ReadonlyArray<Plane>): Step => {
+  const { pose, vx, vy, missed } = state
+  const ahead = missed + 1
+  const px = pose.cx + vx * ahead
+  const py = pose.cy + vy * ahead
+  // Search around the last position, widened by speed (so stopping and reversing stay inside) and
+  // by every frame without a match; the prediction breaks ties.
+  const grow = model.radius * Math.min(missed, 3)
+  const rx = model.radius + Math.abs(vx) + grow
+  const ry = model.radius + Math.abs(vy) + grow
+  const found = search(
+    levels,
+    model.templates,
+    {
+      x0: Math.min(pose.cx, px) - rx,
+      x1: Math.max(pose.cx, px) + rx,
+      y0: Math.min(pose.cy, py) - ry,
+      y1: Math.max(pose.cy, py) + ry,
+      px,
+      py
+    },
+    pose.s,
+    MIN_VISIBLE,
+    true
+  )
+  // A match far from where the subject should be must be convincing: a faint or vanished subject
+  // otherwise "matches" whatever background structure is nearby.
+  const off = found === undefined ? 0 : Math.hypot(found.pose.cx - px, found.pose.cy - py)
+  const near = model.near + 0.5 * Math.hypot(vx, vy)
+  const need = Math.max(missed > 0 ? RECOVER : LOST, off > near ? JUMP : 0)
+  if (found !== undefined && found.score.q >= need) {
+    const s = found.score.visible >= SCALE_VISIBLE ? found.pose.s : pose.s
+    const next = { cx: found.pose.cx, cy: found.pose.cy, s }
+    state.vx = (next.cx - pose.cx) / ahead
+    state.vy = (next.cy - pose.cy) / ahead
+    state.pose = next
+    state.missed = 0
+    state.reason = undefined
+    return { _tag: "found", pose: next, q: found.score.q }
   }
-  const at = (x: number, y: number) =>
-    x < 0 || y < 0 || x > maxX || y > maxY ? best : sad(g, t, x, y, Infinity)
-  const sx = vertex(at(bx - 1, by), best, at(bx + 1, by))
-  const sy = vertex(at(bx, by - 1), best, at(bx, by + 1))
-  const patch = cut(g, bx, by, t.w, t.h)
-  const ring = ringMean(g, bx, by, t.w, t.h)
-  const q = quality(t, patch, ring)
-  if (q < LOST) {
-    // At the edge when the box touches it, or was heading past it: part of the subject left the frame.
-    const edge =
-      s.x <= 0 || s.y <= 0 || s.x >= maxX || s.y >= maxY || px < 0 || py < 0 || px > maxX || py > maxY
-    s.radius = Math.min(4 * baseRadius, s.radius * 2)
-    s.vx = 0
-    s.vy = 0
-    return { x: null, y: null, q, lost: edge ? ("edge" as const) : ("low-confidence" as const) }
+  state.missed = missed + 1
+  state.reason ??= lostReason(model, levels[0]!, pose, { cx: px, cy: py, s: pose.s })
+  return { _tag: "lost", q: found?.score.q ?? 0, reason: state.reason }
+}
+
+/**
+ * Why the subject was not found: it is past the frame edge at its predicted position, nothing with
+ * its contrast is where it was last seen (it faded or was hidden), or something unlike it is there.
+ */
+const lostReason = (model: Model, plane: Plane, last: Pose, predicted: Pose): LostReason => {
+  const t = model.templates[0]!
+  if (score(plane, t, predicted).visible < EDGE_VISIBLE) return "edge"
+  // A template with no structure of its own (a box on plain background) cannot tell a fade apart.
+  if (t.variance < FLAT_TEMPLATE) return "low-confidence"
+  return score(plane, t, last).contrast < FADED_CONTRAST ? "faded" : "low-confidence"
+}
+
+/** The template at every level, cut around the box on the anchor frame. */
+const modelOf = (base: Plane, box: Box, size: Size): { model: Model; start: Pose } => {
+  const sx = base.width / size.width
+  const sy = base.height / size.height
+  const cx = (box.x + box.w / 2) * sx
+  const cy = (box.y + box.h / 2) * sy
+  let tw = Math.max(2, Math.round(box.w * sx))
+  let th = Math.max(2, Math.round(box.h * sy))
+  // The subject's own edges carry most of the match (and all of its scale), so the template keeps a
+  // thin margin of surroundings; a flat subject gets a wider one, as its edges are all it has.
+  const pad =
+    cutTemplate(base, cx, cy, tw, th).variance < FLAT_TEMPLATE
+      ? Math.max(2, Math.round(0.2 * Math.min(tw, th)))
+      : MARGIN
+  tw += 2 * pad
+  th += 2 * pad
+  let levels = 1
+  while (levels < 6 && Math.min(tw, th) / 2 ** levels >= COARSE_SIDE) levels++
+  const planes = pyramid(base, levels)
+  const templates = planes.map((p, k) =>
+    cutTemplate(
+      p,
+      cx / 2 ** k,
+      cy / 2 ** k,
+      Math.max(2, Math.round(tw / 2 ** k)),
+      Math.max(2, Math.round(th / 2 ** k))
+    )
+  )
+  return {
+    model: {
+      templates,
+      levels,
+      sx,
+      sy,
+      radius: Math.max(6, 0.5 * Math.max(tw, th)),
+      near: Math.max(3, 0.15 * Math.max(tw, th))
+    },
+    start: { cx, cy, s: 1 }
   }
-  s.vx = bx - s.x
-  s.vy = by - s.y
-  s.x = bx
-  s.y = by
-  s.radius = baseRadius
-  // Re-anchor on the original appearance when it still matches; otherwise follow the new look.
-  if (quality(s.original, patch, ring) >= REFRESH) s.template = s.original
-  else if (q >= REFRESH) s.template = patch
-  return { x: bx + sx, y: by + sy, q, lost: undefined }
 }
 
 /** Runs of lost frames, each with the reason of its first frame. */
@@ -226,16 +244,19 @@ const lostSpans = (range: FrameRange, reasons: ReadonlyArray<LostReason | undefi
     const reason = reasons[i]
     if (reason === undefined) continue
     const start = i
-    while (i + 1 <= range.last && reasons[i + 1] !== undefined) i++
+    while (i + 1 <= range.last && reasons[i + 1] === reason) i++
     out.push({ from: range.ref(start), to: range.ref(i), reason })
   }
   return out
 }
 
+const span = (from: number, to: number): Array<FrameIndex> =>
+  from > to ? [] : Array.from({ length: to - from + 1 }, (_, k) => frameIndex(from + k))
+
 /**
- * Follow `box` (source px, at `range.first`) through `range` by template matching
- * on grayscale: SAD inside a search window around the last position, widened by speed,
- * sub-pixel refinement, and template refresh while the match is good.
+ * Follow `box` (source px, as it is at the anchor frame) through `range`, forwards and backwards
+ * from the anchor: ZNCC template matching, coarse to fine on an image pyramid, with sub-pixel
+ * position and scale. A lost region is searched for around its predicted path and picked up again.
  */
 export const trackRegion = (
   source: Source,
@@ -243,74 +264,87 @@ export const trackRegion = (
   box: Box,
   options: TrackOptions = {}
 ): Effect.Effect<RegionTrack, KymoError> =>
-  Effect.suspend(() => {
+  Effect.gen(function* () {
     const name = options.name ?? "box"
-    const n = range.frameCount
-    const nulls = () => Array.from({ length: n }, (): number | null => null)
-    const xs = nulls()
-    const ys = nulls()
-    const ws = nulls()
-    const hs = nulls()
-    const qs = nulls()
-    const reasons: Array<LostReason | undefined> = Array.from({ length: n }, () => undefined)
-    let state: State | undefined
-    let scale = 1
-    let baseRadius = 0
-    // The template sits on whole pixels; this is how far the requested box was from them.
-    let offset = { x: 0, y: 0 }
     const size = source.timeline.size
     if (size === null) {
-      return Effect.fail(
+      return yield* Effect.fail(
         new InvalidInput({
           message: `${source.timeline.handle} has no pixels to track.`,
           hint: "Track a region on a video, image sequence or web source; telemetry has tracks already."
         })
       )
     }
-    const stream = source.readFrames(range.indices(), { maxEdge: options.maxEdge ?? 480 })
-    return Stream.runForEach(stream, (frame) =>
-      Effect.sync(() => {
-        const g = toGray(frame.image)
-        const i = frame.index
-        if (state === undefined) {
-          scale = g.width / size.width
-          const tw = Math.max(2, Math.min(g.width, Math.round(box.w * scale)))
-          const th = Math.max(2, Math.min(g.height, Math.round(box.h * scale)))
-          const tx = Math.max(0, Math.min(g.width - tw, Math.round(box.x * scale)))
-          const ty = Math.max(0, Math.min(g.height - th, Math.round(box.y * scale)))
-          const template = cut(g, tx, ty, tw, th)
-          baseRadius = Math.max(6, Math.round(0.75 * Math.max(tw, th)))
-          state = { template, original: template, x: tx, y: ty, vx: 0, vy: 0, radius: baseRadius }
-          offset = { x: box.x - tx / scale, y: box.y - ty / scale }
-          xs[i] = round(box.x, 2)
-          ys[i] = round(box.y, 2)
-          qs[i] = 1
-        } else {
-          const m = match(g, state, baseRadius)
-          qs[i] = round(m.q, 3)
-          reasons[i] = m.lost
-          if (m.x !== null && m.y !== null) {
-            xs[i] = round(m.x / scale + offset.x, 2)
-            ys[i] = round(m.y / scale + offset.y, 2)
-          }
-        }
-        if (xs[i] !== null) {
-          ws[i] = round(box.w, 2)
-          hs[i] = round(box.h, 2)
-        }
-      })
-    ).pipe(
-      Effect.map(() => ({
-        name,
-        method: "template" as const,
-        from: range.ref(range.first),
-        to: range.ref(range.last),
-        x: { name: `${name}.x`, unit: "px", samples: xs },
-        y: { name: `${name}.y`, unit: "px", samples: ys },
-        w: { name: `${name}.w`, unit: "px", samples: ws },
-        h: { name: `${name}.h`, unit: "px", samples: hs },
-        confidence: { name: `${name}.confidence`, unit: "0..1", samples: qs },
-        lost: lostSpans(range, reasons)
-      }))
+    const anchor = options.anchor ?? range.first
+    if (anchor < range.first || anchor > range.last) {
+      return yield* Effect.fail(
+        new InvalidInput({
+          message: `The anchor frame #${anchor} is outside ${range.spanText(range.first, range.last)}.`,
+          hint: `Give the box at a frame inside the range, e.g. #${range.first}.`
+        })
+      )
+    }
+    const longEdge = Math.max(size.width, size.height)
+    const maxEdge =
+      options.maxEdge ?? Math.max(16, Math.round(longEdge * Math.min(1, WORK_EDGE / Math.max(box.w, box.h))))
+    const read = (indices: ReadonlyArray<FrameIndex>) =>
+      Stream.runCollect(source.readFrames(indices, { maxEdge }))
+
+    const nulls = () => Array.from({ length: range.frameCount }, (): number | null => null)
+    const xs = nulls()
+    const ys = nulls()
+    const ws = nulls()
+    const hs = nulls()
+    const qs = nulls()
+    const reasons: Array<LostReason | undefined> = Array.from({ length: range.frameCount }, () => undefined)
+
+    const [first] = yield* read([frameIndex(anchor)])
+    const { model, start } = modelOf(planeOf(first!.image), box, size)
+    const record = (index: number, pose: Pose, q: number) => {
+      xs[index] = round(pose.cx / model.sx - (pose.s * box.w) / 2, 2)
+      ys[index] = round(pose.cy / model.sy - (pose.s * box.h) / 2, 2)
+      ws[index] = round(pose.s * box.w, 2)
+      hs[index] = round(pose.s * box.h, 2)
+      qs[index] = round(q, 3)
+    }
+    xs[anchor] = round(box.x, 2)
+    ys[anchor] = round(box.y, 2)
+    ws[anchor] = round(box.w, 2)
+    hs[anchor] = round(box.h, 2)
+    qs[anchor] = 1
+
+    const follow = (state: State, index: number, base: Plane) => {
+      const r = step(model, state, pyramid(base, model.levels))
+      if (r._tag === "found") record(index, r.pose, r.q)
+      else {
+        qs[index] = round(r.q, 3)
+        reasons[index] = r.reason
+      }
+    }
+
+    const forward: State = { pose: start, vx: 0, vy: 0, missed: 0, reason: undefined }
+    yield* Stream.runForEach(source.readFrames(span(anchor + 1, range.last), { maxEdge }), (frame) =>
+      Effect.sync(() => follow(forward, frame.index, planeOf(frame.image)))
     )
+    // Backwards: decode a chunk in order (video decodes forwards), then follow it in reverse.
+    const backward: State = { pose: start, vx: 0, vy: 0, missed: 0, reason: undefined }
+    for (let end = anchor - 1; end >= range.first; end -= BACKWARD_CHUNK) {
+      const frames = yield* read(span(Math.max(range.first, end - BACKWARD_CHUNK + 1), end))
+      const planes = frames.map((f) => ({ index: f.index, plane: planeOf(f.image) }))
+      for (let k = planes.length - 1; k >= 0; k--) follow(backward, planes[k]!.index, planes[k]!.plane)
+    }
+
+    return {
+      name,
+      method: "template" as const,
+      from: range.ref(range.first),
+      to: range.ref(range.last),
+      anchor: range.ref(anchor),
+      x: { name: `${name}.x`, unit: "px", samples: xs },
+      y: { name: `${name}.y`, unit: "px", samples: ys },
+      w: { name: `${name}.w`, unit: "px", samples: ws },
+      h: { name: `${name}.h`, unit: "px", samples: hs },
+      confidence: { name: `${name}.confidence`, unit: "0..1", samples: qs },
+      lost: lostSpans(range, reasons)
+    }
   })
