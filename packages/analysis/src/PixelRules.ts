@@ -71,8 +71,7 @@ export const duplicateFrames = (input: PixelInput): Array<Finding> => {
           count === 1
             ? `${Address.label(range.rate, first)} repeats the frame before it while the picture is moving: a held or duplicated frame.`
             : `${count} frames from ${Address.label(range.rate, first)} repeat the frame before them while the picture is moving.`,
-        view: "diff",
-        at: [first - 1, first, last, last + 1]
+        view: "diff"
       })
     ]
   })
@@ -97,8 +96,7 @@ export const droppedFrames = (input: PixelInput): Array<Finding> => {
         severity: "warning",
         index: i,
         message: `Motion into ${Address.label(range.rate, i)} is ${ratio.toFixed(1)}x its steady neighbours: a frame between ${Address.format(range.rate, i - 1)} and ${Address.format(range.rate, i)} looks dropped.`,
-        view: "diff",
-        at: [i - 2, i - 1, i, i + 1]
+        view: "diff"
       })
     ]
   })
@@ -127,8 +125,7 @@ export const flicker = ({ scan }: PixelInput): Array<Finding> => {
         severity: step >= FLICKER_ERROR ? "error" : "warning",
         index: i,
         message: `${Address.label(range.rate, i)} is ${up > 0 ? "brighter" : "darker"} than both neighbours by ${(step * 100).toFixed(0)}% luma for one frame: a flicker.`,
-        view: "diff",
-        at: [i - 1, i, i + 1]
+        view: "diff"
       })
     ]
   })
@@ -147,8 +144,7 @@ export const blackFrames = ({ scan }: PixelInput): Array<Finding> => {
       index: first,
       last,
       message: `${count} near-black frame${count > 1 ? "s" : ""} from ${Address.label(range.rate, first)}${atEdge ? " at the edge of the range (a fade in or out?)" : " in the middle of the range"}.`,
-      view: "sheet",
-      at: [first - 1, first, last, last + 1]
+      view: "sheet"
     })
   })
 }

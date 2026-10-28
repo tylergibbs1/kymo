@@ -311,6 +311,32 @@ describe("check", () => {
     }).pipe(Effect.provide(fresh))
   )
 
+  it.effect(
+    "suggests every frame of a short finding plus a neighbour each side, and a stepped range for a long one",
+    () =>
+      Effect.gen(function* () {
+        const dups = yield* call(check, {
+          source: "synthetic:dropped?dups=5,50,51,52",
+          rules: ["duplicate-frames"]
+        })
+        expect(dups.findings.map((f) => f.suggest.arguments.at)).toEqual([
+          ["4f", "5f", "6f"],
+          ["01s19f", "01s20f", "01s21f", "01s22f", "01s23f"]
+        ])
+        const safe = yield* call(check, { source: "synthetic:safe-area", rules: ["safe-area"] })
+        const [long] = safe.findings
+        expect(long!.span).toBe(`${long!.address}..02s29f`)
+        const before = (yield* call(frames, { source: safe.handle, at: [`#${long!.index - 1}`] })).frames[0]!
+          .address
+        expect(long!.suggest.arguments.at[0]).toMatch(new RegExp(`^${before}\\.\\.02s29f:\\d+f$`))
+        const shown = yield* call(frames, long!.suggest.arguments)
+        expect(shown.frames.length).toBeLessThanOrEqual(14)
+        expect(shown.frames.map((f) => f.address)).toEqual(
+          expect.arrayContaining([before, long!.address, "02s29f"])
+        )
+      }).pipe(Effect.provide(fresh))
+  )
+
   it.effect("counts findings by severity and says so next to pass", () =>
     Effect.gen(function* () {
       const out = yield* call(check, {

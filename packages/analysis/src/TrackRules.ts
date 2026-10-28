@@ -52,7 +52,7 @@ export const safeArea = (
           last: i - 1,
           message: `${region.name} leaves the ${Math.round(margin * 100)}% safe area from ${Address.label(range.rate, start)}, by up to ${worst.toFixed(1)}px at ${Address.format(range.rate, worstAt)}.`,
           view: "grid",
-          at: [start, worstAt]
+          context: [worstAt]
         })
       )
     }
@@ -89,7 +89,7 @@ export const nonMonotonic = (range: FrameRange, tracks: ReadonlyArray<Track>): A
             last: recover,
             message: `${track.name} reverses on its way from ${round(v0)} to ${round(v1)}: it reached ${round(extreme)} at ${Address.format(range.rate, extremeAt)}, then went back to ${round(v)} at ${Address.label(range.rate, i)}.`,
             view: "onion",
-            at: [extremeAt, i, recover]
+            context: [extremeAt]
           })
         ]
       }
