@@ -1,4 +1,11 @@
-import { type Box, type FrameChange, VISIBLE_STEP, pairChanges, parseBox } from "@kymo/analysis"
+import {
+  type Box,
+  type FrameChange,
+  VISIBLE_STEP,
+  pairChanges,
+  parseBox,
+  referenceChanges
+} from "@kymo/analysis"
 import { boxOn } from "../Region.ts"
 import {
   Address,
@@ -7,7 +14,10 @@ import {
   InvalidInput,
   type KymoError,
   Marker,
+  FRAME_CAP,
+  NUMBERS_CAP,
   type Source,
+  type Timeline,
   capStep,
   enforceFrameCap,
   secondsAt
@@ -24,6 +34,7 @@ import { Workspace } from "@kymo/sources"
 import { type FollowBox, type ViewResult, diff, follow, onion, sheet } from "@kymo/views"
 import { Effect, Schema } from "effect"
 import {
+  Address as AddressField,
   Addresses,
   BoxText,
   Cursor,
@@ -35,7 +46,7 @@ import {
 } from "../Fields.ts"
 import { checkSyntax, resolveAddresses, resolveSpan } from "../Frames.ts"
 import { FrameLabels } from "../FrameLabels.ts"
-import { define, jsonLines } from "../Operation.ts"
+import { define, jsonLines, optionHint } from "../Operation.ts"
 import { OutputDir } from "../OutputDir.ts"
 import { Sheet, SheetFrame, sheetOf, toSheets } from "../Sheets.ts"
 
@@ -43,7 +54,7 @@ const fields = {
   source: SourceField,
   view: FramesView.annotate({
     description:
-      "sheet (default): the frames side by side, labelled. onion: 3–16 frames blended into one image to show path and spacing. diff: what changed since each frame's previous frame, on a fixed scale (black = no change beyond the clip's noise), with each frame's changed fraction in diff. follow: crop `box` from every frame. grid: a sheet with source-pixel coordinates drawn on, for orientation only."
+      "sheet (default): the frames side by side, labelled. onion: 3–16 frames blended into one image to show path and spacing. diff: what changed since each frame's previous frame (or since against), on a fixed scale (black = no change beyond the clip's noise), with each frame's changed fraction in diff. follow: crop `box` from every frame. grid: a sheet with source-pixel coordinates drawn on, for orientation only."
   }).pipe(Schema.withDecodingDefaultKey(Effect.succeed("sheet" as const))),
   target: TargetInput,
   format: Format,
@@ -53,6 +64,15 @@ const fields = {
         "For view=follow: the region to crop. For view=diff: the region the numbers in diff are measured in (default the whole frame). x,y,w,h in source pixels."
     })
   ),
+  against: Schema.optionalKey(
+    AddressField.annotate({
+      description:
+        "For view=diff: one frame to compare every frame with, instead of the frame before it, e.g. -1f (the last frame) or 0f. Each frame's heatmap and numbers in diff are then its difference from this frame, so the first frame with changedFraction 0 against -1f is where the picture reaches its final look."
+    })
+  ),
+  numbersOnly: Schema.Boolean.annotate({
+    description: `For view=diff: return the numbers in diff for every frame and draw no images, so the ${FRAME_CAP}-frame image cap does not apply (numbers stop at ${NUMBERS_CAP} frames unless uncapped).`
+  }).pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
   uncapped: Uncapped.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
   separate: Schema.Boolean.annotate({
     description:
@@ -79,11 +99,11 @@ export const FrameValues = Schema.Struct({
 })
 
 export const DiffFrame = Schema.Struct({
-  address: Schema.String.annotate({ description: "Frame N, compared with N-1." }),
+  address: Schema.String.annotate({ description: "Frame N, compared with N-1, or with against." }),
   index: FrameIndex,
   changedFraction: Schema.Number.annotate({
     description:
-      "Fraction of the pixels (inside box, or of the whole frame) that changed from N-1 beyond floor, 0..1. 0 means nothing visibly changed."
+      "Fraction of the pixels (inside box, or of the whole frame) that differ from N-1 (or from against) beyond floor, 0..1. 0 means no visible difference."
   }),
   changedMean: Schema.Number.annotate({
     description: "Mean luma change of those pixels, 0..1; 0 when none changed."
@@ -91,6 +111,10 @@ export const DiffFrame = Schema.Struct({
 })
 
 export const DiffNumbers = Schema.Struct({
+  against: Schema.NullOr(Schema.String).annotate({
+    description:
+      "The frame every frame was compared with; null when each was compared with the one before it."
+  }),
   box: Schema.NullOr(Schema.String).annotate({
     description: "The region measured, x,y,w,h in source pixels; null for the whole frame."
   }),
@@ -100,7 +124,7 @@ export const DiffNumbers = Schema.Struct({
   }),
   frames: Schema.Array(DiffFrame).annotate({
     description:
-      "One per diffed frame, in order. A diff at N compares N with N-1, so the frame where something reaches its final state is the last one with a non-zero changedFraction."
+      "One per diffed frame, in order. A diff at N compares N with N-1, so the frame where something reaches its final state is the last one with a non-zero changedFraction; against -1f, it is the first frame from which every changedFraction is 0."
   })
 })
 
@@ -136,6 +160,8 @@ interface Draw {
   readonly box: FollowBox | undefined
   /** view=diff: levels of change drawn black (the noise floor the numbers use too). */
   readonly floor: number
+  /** view=diff: the frame every frame is compared with, instead of the one before it. */
+  readonly against: FrameIndex | undefined
   readonly labelStyle: Address.LabelStyle
 }
 
@@ -155,7 +181,7 @@ const drawView = (d: Draw, frames: ReadonlyArray<FrameIndex>, cursor: CursorType
     case "grid":
       return sheet({ ...common, pixelGrid: true })
     case "diff":
-      return diff({ ...common, floor: d.floor })
+      return diff({ ...common, floor: d.floor, against: d.against })
     case "onion":
       return Effect.map(
         onion({ source: d.source, frames, outDir: d.outDir, target: d.target, labelStyle: d.labelStyle }),
@@ -204,14 +230,25 @@ const followBox = (source: Source, text: string): Effect.Effect<FollowBox, KymoE
   })
 }
 
-const viewLabel = (input: FramesInput, floor: number): string | undefined =>
+const viewLabel = (input: FramesInput, floor: number, against: string | undefined): string | undefined =>
   input.view === "sheet"
     ? undefined
     : input.view === "follow"
       ? `follow ${input.box}`
       : input.view === "diff"
-        ? `diff of each frame with the one before, black under ${floor} luma steps, white a full-scale change`
+        ? `${against === undefined ? "diff of each frame with the one before" : `diff against ${against}`}, black under ${floor} luma steps, white a full-scale change`
         : input.view
+
+/** The one frame `against` names. */
+const oneFrame = (timeline: Timeline, text: string): Effect.Effect<FrameIndex, KymoError> =>
+  Effect.flatMap(resolveAddresses(timeline, [text]), (found) =>
+    found.length === 1
+      ? Effect.succeed(found[0]!)
+      : invalid(
+          `against names ${found.length} frames (${text}); a diff is against one frame.`,
+          `Pass one address, e.g. ${optionHint(fields, "against", "-1f")} for the last frame.`
+        )
+  )
 
 /** The whole frame as a box, for diff numbers without one. */
 const wholeFrame = (source: Source): Box | undefined =>
@@ -252,6 +289,12 @@ export const frames = define({
         `box is only used by view=follow and view=diff, not view=${input.view}.`,
         "Pass view=follow or view=diff, or drop box."
       )
+    for (const key of ["against", "numbersOnly"] as const)
+      if (input.view !== "diff" && input[key] !== undefined && input[key] !== false)
+        return yield* invalid(
+          `${key} is only used by view=diff, not view=${input.view}.`,
+          `Pass ${optionHint(fields, "view", "diff")}, or drop ${key}.`
+        )
     if (input.separate && input.view === "onion")
       return yield* invalid(
         "An onion blends its frames into one image, so it cannot be separate.",
@@ -265,13 +308,22 @@ export const frames = define({
     const { timeline } = source
     const indices =
       "at" in input ? yield* resolveAddresses(timeline, input.at) : yield* resolveSpan(timeline, input.range)
-    yield* enforceFrameCap(
-      indices.length,
-      input.uncapped,
-      `Thin it with a step, e.g. range=${Address.format(timeline.rate, indices[0]!)}..${Address.format(timeline.rate, indices[indices.length - 1]!)}:${capStep(indices.length)}f, or pass fewer addresses.`
-    )
+    const span = `${Address.format(timeline.rate, indices[0]!)}..${Address.format(timeline.rate, indices[indices.length - 1]!)}`
+    yield* input.numbersOnly
+      ? enforceFrameCap(
+          indices.length,
+          input.uncapped,
+          `Narrow the range, or thin it with a step, e.g. range=${span}:${Math.max(2, Math.ceil(indices.length / NUMBERS_CAP))}f.`,
+          NUMBERS_CAP
+        )
+      : enforceFrameCap(
+          indices.length,
+          input.uncapped,
+          `Thin it with a step, e.g. range=${span}:${capStep(indices.length)}f, or pass fewer addresses.${input.view === "diff" ? ` For the numbers alone, without images, pass ${optionHint(fields, "numbersOnly", true)}.` : ""}`
+        )
+    const against = input.against === undefined ? undefined : yield* oneFrame(timeline, input.against)
     // A diff shows each frame against the one before; the first frame has none, so it is skipped.
-    const skipFirst = input.view === "diff" && indices[0] === 0 && indices.length > 1
+    const skipFirst = input.view === "diff" && against === undefined && indices[0] === 0 && indices.length > 1
     const drawn = skipFirst ? indices.slice(1) : indices
     const measuredIn =
       input.view !== "diff"
@@ -282,11 +334,13 @@ export const frames = define({
     const changes =
       measuredIn === undefined
         ? undefined
-        : yield* pairChanges(
-            source,
-            drawn.filter((i) => i > 0),
-            measuredIn
-          )
+        : against === undefined
+          ? yield* pairChanges(
+              source,
+              drawn.filter((i) => i > 0),
+              measuredIn
+            )
+          : yield* referenceChanges(source, drawn, against, measuredIn)
     const floor = changes?.floor ?? VISIBLE_STEP
     const draw: Draw = {
       source,
@@ -296,11 +350,14 @@ export const frames = define({
       box:
         input.view === "follow" && input.box !== undefined ? yield* followBox(source, input.box) : undefined,
       floor,
+      against,
       labelStyle: style
     }
-    const result = input.separate
-      ? yield* drawSeparate(draw, drawn, input.cursor)
-      : yield* drawView(draw, drawn, input.cursor)
+    const result: ViewResult = input.numbersOnly
+      ? { images: [], next: null }
+      : input.separate
+        ? yield* drawSeparate(draw, drawn, input.cursor)
+        : yield* drawView(draw, drawn, input.cursor)
     const offset = input.cursor === undefined ? 0 : cursorOffset(input.cursor)
     const detailed = input.format === "detailed"
     const refs = indices.map((index) => {
@@ -308,7 +365,8 @@ export const frames = define({
       return detailed ? { address, index, t: secondsAt(timeline.rate, index) } : { address, index }
     })
     const shown = result.images.reduce((n, image) => n + image.frames.length, 0)
-    const viewLabelText = viewLabel(input, floor)
+    const againstText = against === undefined ? undefined : Address.styledLabel(timeline.rate, against, style)
+    const viewLabelText = viewLabel(input, floor, againstText)
     const sheets = input.separate
       ? result.images.map((image, k) =>
           sheetOf(
@@ -366,6 +424,7 @@ export const frames = define({
         ? {}
         : {
             diff: {
+              against: against === undefined ? null : Address.format(timeline.rate, against),
               box: input.box ?? null,
               floor,
               frames: changes.frames.map((c: FrameChange) => ({

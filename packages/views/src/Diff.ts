@@ -17,8 +17,10 @@ import { label } from "./internal/Svg.ts"
 
 export interface DiffOptions extends Paging {
   readonly source: Source
-  /** Each frame N is drawn as |N − (N−1)|, labelled with N's address. */
+  /** Each frame N is drawn as |N − (N−1)|, or |N − against|, labelled with N's address. */
   readonly frames: ReadonlyArray<FrameIndex>
+  /** The frame every frame is compared with, instead of the one before it. */
+  readonly against?: FrameIndex | undefined
   /** Levels (0..255) of change drawn black: the clip's noise. Above it the colour scale is fixed. */
   readonly floor: number
   readonly outDir: string
@@ -27,13 +29,15 @@ export interface DiffOptions extends Paging {
 }
 
 /**
- * What changed since the previous frame, as heatmaps on a fixed scale (black = no change beyond
- * `floor`), written as `<span>.diff.png`.
+ * What changed since the previous frame (or since `against`), as heatmaps on a fixed scale (black =
+ * no change beyond `floor`), written as `<span>.diff.png` (`<span>.diff-against-<address>.png`).
  */
 export const diff = Effect.fn("diff")(function* (o: DiffOptions): Effect.fn.Return<ViewResult, KymoError> {
   const { timeline } = o.source
   yield* checkFrames(o.source, o.frames)
-  if (o.frames.includes(frameIndex(0)))
+  const against = o.against
+  if (against !== undefined) yield* checkFrames(o.source, [against])
+  if (against === undefined && o.frames.includes(frameIndex(0)))
     return yield* new InvalidInput({
       message: "0f has no previous frame to diff against.",
       hint: "Start the range at 1f (#1) or later."
@@ -53,10 +57,12 @@ export const diff = Effect.fn("diff")(function* (o: DiffOptions): Effect.fn.Retu
     view: "diff",
     target: o.target,
     outDir: o.outDir,
-    fileName: (span: string) => `${span}.diff.png`
+    fileName: (span: string) =>
+      against === undefined ? `${span}.diff.png` : `${span}.diff-against-${spanOf(timeline, [against])}.png`
   } as const
   return yield* writePages(destination, pages, o.frames, (plan, indices) => {
-    const wanted = [...new Set(indices.flatMap((i) => [i - 1, i]))].sort((a, b) => a - b).map(frameIndex)
+    const before = (i: number) => against ?? i - 1
+    const wanted = [...new Set(indices.flatMap((i) => [before(i), i]))].sort((a, b) => a - b).map(frameIndex)
     return Effect.map(
       readFrames(o.source, wanted, Math.max(plan.frame.width, plan.frame.height)),
       (decoded) => {
@@ -69,7 +75,7 @@ export const diff = Effect.fn("diff")(function* (o: DiffOptions): Effect.fn.Retu
             width: plan.width,
             height: plan.height,
             tiles: current.map((f, k) => ({
-              image: heatmap(byIndex.get(f.index - 1)!.image, f.image, o.floor),
+              image: heatmap(byIndex.get(before(f.index))!.image, f.image, o.floor),
               rect: plan.cells[k]!.frame
             })),
             overlay: plan.cells

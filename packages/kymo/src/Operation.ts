@@ -92,17 +92,19 @@ export const kebab = (key: string): string => key.replace(/[A-Z]/g, (c) => `-${c
 
 /**
  * An option as both shells spell it, for hints: `box=120,80,64,64 (CLI: --box 120,80,64,64)`, or for
- * a list `tracks=["box.x","box.y"] (CLI: --tracks box.x box.y)`. The key is typed against the input's
+ * a list `tracks=["box.x","box.y"] (CLI: --tracks box.x box.y)`, or a switch `uncapped=true (CLI: --uncapped)`. The key is typed against the input's
  * fields, so a hint cannot name an option the input does not have.
  */
 export const optionHint = <F extends Schema.Struct.Fields>(
-  _input: Schema.Struct<F>,
+  _fields: F,
   key: keyof F & string,
-  value: string | ReadonlyArray<string>
+  value: string | ReadonlyArray<string> | true
 ): string =>
-  typeof value === "string"
-    ? `${key}=${value} (CLI: --${kebab(key)} ${value})`
-    : `${key}=${JSON.stringify(value)} (CLI: --${kebab(key)} ${value.join(" ")})`
+  value === true
+    ? `${key}=true (CLI: --${kebab(key)})`
+    : typeof value === "string"
+      ? `${key}=${value} (CLI: --${kebab(key)} ${value})`
+      : `${key}=${JSON.stringify(value)} (CLI: --${kebab(key)} ${value.join(" ")})`
 
 /** Unknown keys are errors: a typo silently falling back to a default is the worst failure. */
 const parseOptions = { onExcessProperty: "error", errors: "all" } as const

@@ -108,7 +108,7 @@ const monotonicTracks = (
       ? Effect.succeed([])
       : invalid(
           "tracks is only read by the non-monotonic rule, which this check does not run.",
-          `Add the rule, e.g. ${optionHint(CheckInput, "rules", ["non-monotonic"])}, or drop tracks.`
+          `Add the rule, e.g. ${optionHint(CheckInput.fields, "rules", ["non-monotonic"])}, or drop tracks.`
         )
   const fromBox =
     measured === undefined ? [] : [measured.x, measured.y, measured.w, measured.h, measured.opacity]
@@ -218,7 +218,7 @@ export const check = define({
     const boxHint =
       timeline.size === null
         ? "Pass a source with pixels and its box"
-        : `Pass the box as it is at the first frame of the range, e.g. ${optionHint(CheckInput, "box", exampleBox(timeline.size))}; ${findBoxHint(source, range)}`
+        : `Pass the box as it is at the first frame of the range, e.g. ${optionHint(CheckInput.fields, "box", exampleBox(timeline.size))}; ${findBoxHint(source, range)}`
     if (input.rules?.includes("safe-area") && regions.length === 0 && timeline.size !== null)
       return yield* invalid(
         `safe-area needs the box of what must stay inside the frame, and ${timeline.handle} has no box.* tracks.`,
