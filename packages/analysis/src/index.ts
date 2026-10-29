@@ -49,3 +49,4 @@ export { Finding, RULES, RuleName, Severity, SuggestView, parseRules } from "./F
 export { CheckReport, type CheckInput, check } from "./Check.ts"
 export { type Assertion, type Op, type Relation, type When, parseAssertion } from "./AssertParse.ts"
 export { type AssertContext, type AssertInput, AssertionResult, evaluate, runAssertions } from "./Assert.ts"
+export { PRESETS, type Preset, bezierAt } from "./Curves.ts"

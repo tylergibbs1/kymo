@@ -1032,7 +1032,7 @@
       "prompt": "This is a screen recording of a web page. A dialog moves once. At 0f it is inside the box x=400, y=400, w=480, h=280 (pixels). Which easing curve does its motion follow?\n\nEnd your reply with one line `ANSWER: <label>`, where the label is one of linear, ease-in, ease-out, ease-in-out, spring.",
       "answer": {
         "_tag": "label",
-        "value": "ease-out"
+        "value": "ease"
       },
       "followUps": []
     },

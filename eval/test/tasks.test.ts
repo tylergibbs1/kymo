@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { Sources } from "@kymo/sources"
 import { Effect } from "effect"
 import { DEV_SHARE, splitOf } from "../src/Split.ts"
+import { PRESETS, bezierAt } from "@kymo/analysis"
 import { CASES, buildTask, classifyEasing, generate } from "../src/Synthetic.ts"
 import { loadClips, loadTaskFile } from "../src/TaskSet.ts"
 
@@ -90,39 +91,18 @@ describe("synthetic task generation", () => {
 
 describe("classifyEasing", () => {
   const curve = (f: (t: number) => number) => Array.from({ length: 41 }, (_, i) => f(i / 40))
-  it("names the presets by their quarter points and springs by overshoot", () => {
-    assert.strictEqual(
-      classifyEasing(
-        curve((t) => t),
-        0,
-        40
-      ),
-      "linear"
-    )
-    assert.strictEqual(
-      classifyEasing(
-        curve((t) => t * t),
-        0,
-        40
-      ),
-      "ease-in"
-    )
-    assert.strictEqual(
-      classifyEasing(
-        curve((t) => 1 - (1 - t) ** 2),
-        0,
-        40
-      ),
-      "ease-out"
-    )
-    assert.strictEqual(
-      classifyEasing(
-        curve((t) => (t < 0.5 ? 2 * t * t : 1 - 2 * (1 - t) ** 2)),
-        0,
-        40
-      ),
-      "ease-in-out"
-    )
+  it("names each CSS preset as the curve it is closest to, and springs by overshoot", () => {
+    for (const name of ["linear", "ease", "ease-in", "ease-out", "ease-in-out"] as const) {
+      assert.strictEqual(
+        classifyEasing(
+          curve((t) => bezierAt(PRESETS[name], t)),
+          0,
+          40
+        ),
+        name,
+        name
+      )
+    }
     assert.strictEqual(
       classifyEasing(
         curve((t) => Math.min(1.1, 1.3 * t)),

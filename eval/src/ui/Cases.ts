@@ -2,7 +2,8 @@
  * The UI case list: browser captures, and the questions asked about each. Parameters choose what the
  * page does; no answer is written here. Answers are read from what the browser recorded (Tasks.ts).
  */
-import type { EasingLabel, UiElement } from "../Task.ts"
+import { Schema } from "effect"
+import { EasingLabel, type UiElement } from "../Task.ts"
 import type { CaptureSpec, SceneName } from "./Truth.ts"
 
 /** What is asked, and which recorded element (`dialog`, `next`, …) the answer is read from. */
@@ -41,13 +42,18 @@ const timing = (id: string, capture: CaptureSpec, target: string, element: UiEle
 
 const modal = (params: Readonly<Record<string, string | number>>, crf?: number) => cap("modal", params, crf)
 
-const easing = (
-  id: string,
-  capture: CaptureSpec,
-  target: string,
-  element: UiElement,
-  expect: EasingLabel
-): UiCase => ({ id, capture, family: "ui-easing", target, element, expect })
+/** The easing the page animates with, so the expected label can't disagree with the capture. */
+const easingOf = (capture: CaptureSpec): EasingLabel =>
+  capture.scene === "spring" ? "spring" : Schema.decodeUnknownSync(EasingLabel)(capture.params["ease"])
+
+const easing = (id: string, capture: CaptureSpec, target: string, element: UiElement): UiCase => ({
+  id,
+  capture,
+  family: "ui-easing",
+  target,
+  element,
+  expect: easingOf(capture)
+})
 
 const overshoot = (id: string, capture: CaptureSpec): UiCase => ({
   id,
@@ -178,59 +184,51 @@ export const UI_CASES: ReadonlyArray<UiCase> = [
     "ui-easing-linear",
     modal({ fade: 0, dist: 200, ease: "linear", dur: 600, delay: 100 }),
     "dialog",
-    "dialog",
-    "linear"
+    "dialog"
   ),
   easing(
     "ui-easing-in",
     modal({ fade: 0, dist: 200, ease: "ease-in", dur: 500, delay: 100 }),
     "dialog",
-    "dialog",
-    "ease-in"
+    "dialog"
   ),
   easing(
     "ui-easing-out",
     modal({ fade: 0, dist: 200, ease: "ease-out", dur: 500, delay: 100 }),
     "dialog",
-    "dialog",
-    "ease-out"
+    "dialog"
   ),
   easing(
     "ui-easing-in-out",
     modal({ fade: 0, dist: 200, ease: "ease-in-out", dur: 600, delay: 100 }),
     "dialog",
-    "dialog",
-    "ease-in-out"
+    "dialog"
   ),
   easing(
     "ui-easing-css-ease",
     modal({ fade: 0, dist: 180, ease: "ease", dur: 500, delay: 150 }),
     "dialog",
-    "dialog",
-    "ease-out"
+    "dialog"
   ),
   easing(
     "ui-easing-tooltip-in",
     modal({ w: 180, h: 36, x: 900, y: 140, fade: 0, dist: 60, ease: "ease-in", dur: 400, delay: 100 }),
     "dialog",
-    "tooltip",
-    "ease-in"
+    "tooltip"
   ),
   easing(
     "ui-easing-in-out-crf38",
     modal({ w: 320, h: 200, fade: 0, dist: 150, ease: "ease-in-out", dur: 500, delay: 100 }, 38),
     "dialog",
-    "dialog",
-    "ease-in-out"
+    "dialog"
   ),
-  easing("ui-easing-spring", cap("spring", { k: 170, c: 12 }), "card", "card", "spring"),
-  easing("ui-easing-spring-stiff", cap("spring", { k: 300, c: 20, dist: 500 }), "card", "card", "spring"),
+  easing("ui-easing-spring", cap("spring", { k: 170, c: 12 }), "card", "card"),
+  easing("ui-easing-spring-stiff", cap("spring", { k: 300, c: 20, dist: 500 }), "card", "card"),
   easing(
     "ui-easing-linear-small",
     modal({ w: 120, h: 32, x: 200, y: 150, fade: 0, dist: 50, ease: "linear", dur: 500, delay: 100 }),
     "dialog",
-    "tooltip",
-    "linear"
+    "tooltip"
   ),
 
   // Springs: how many times it swings back before resting.

@@ -12,7 +12,7 @@ export const Split = Schema.Literals(["dev", "heldout"])
 export type Split = typeof Split.Type
 
 /** Easing families a task can ask the model to name. */
-export const EasingLabel = Schema.Literals(["linear", "ease-in", "ease-out", "ease-in-out", "spring"])
+export const EasingLabel = Schema.Literals(["linear", "ease", "ease-in", "ease-out", "ease-in-out", "spring"])
 export type EasingLabel = typeof EasingLabel.Type
 
 /**

@@ -7,6 +7,7 @@ import { Sources, SyntheticAdapter } from "@kymo/sources"
 import { Effect, Layer, Schema } from "effect"
 import { render } from "./Prompts.ts"
 import { splitOf } from "./Split.ts"
+import { PRESETS, type Preset, bezierAt } from "@kymo/analysis"
 import type { Answer, Box, EasingLabel, SyntheticGivens, Task } from "./Task.ts"
 
 /** Ground truth that does not say what the case expected: a defect in the case list or the scene. */
@@ -125,9 +126,12 @@ const subjectAt0 = (source: Source) =>
     } satisfies Box
   })
 
+/** Farther than this from every preset, a motion has no named easing. */
+const MAX_PRESET_RMS = 0.05
+
 /**
- * Name a moving segment's easing from its progress track alone: springs overshoot; bézier presets
- * differ in whether they are behind or ahead of linear at the quarter points.
+ * The easing a motion follows: `spring` if it overshoots, else the CSS preset whose curve it is closest
+ * to (RMS over the motion), or undefined if none is within `MAX_PRESET_RMS`.
  */
 export const classifyEasing = (
   progress: ReadonlyArray<number>,
@@ -137,15 +141,16 @@ export const classifyEasing = (
   overshoot = 1.001
 ): EasingLabel | undefined => {
   if (progress.some((p) => p > overshoot)) return "spring"
-  const at = (t: number) => progress[start + Math.round(t * (end - start))]!
-  const early = at(0.25) - 0.25
-  const late = at(0.75) - 0.75
-  const eps = 0.03
-  if (Math.abs(early) < eps && Math.abs(late) < eps) return "linear"
-  if (early < -eps && late < -eps) return "ease-in"
-  if (early > eps && late > eps) return "ease-out"
-  if (early < -eps && late > eps) return "ease-in-out"
-  return undefined
+  const span = end - start
+  const rms = (preset: Preset) => {
+    let sum = 0
+    for (let i = 0; i <= span; i++) sum += (progress[start + i]! - bezierAt(PRESETS[preset], i / span)) ** 2
+    return Math.sqrt(sum / (span + 1))
+  }
+  const [best] = (Object.keys(PRESETS) as Array<Preset>)
+    .map((preset) => ({ preset, error: rms(preset) }))
+    .sort((a, b) => a.error - b.error)
+  return best !== undefined && best.error <= MAX_PRESET_RMS ? best.preset : undefined
 }
 
 const one = (id: string, values: ReadonlyArray<number>, what: string) =>

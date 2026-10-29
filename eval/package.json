@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.3.0",
+    "@kymo/analysis": "*",
     "@kymo/core": "*",
     "@kymo/layout": "*",
     "@kymo/sources": "*",
