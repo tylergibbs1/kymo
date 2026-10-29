@@ -69,6 +69,8 @@ const MIX_VISIBLE = 0.01
 const MIX_DRIFT_MARGIN = 3
 /** A flash is one frame that differs from both its neighbours by this multiple of how much they differ. */
 const FLASH_RETURN = 2
+/** How much a still picture may add to the way between two others, as a share of it, and still lie between them. */
+const BETWEEN_MARGIN = 0.25
 
 interface Found {
   readonly kind: Cut["kind"]
@@ -150,6 +152,19 @@ const mix = (thumbs: ReadonlyArray<Gray>, a: number, b: number) => {
 }
 
 /**
+ * Whether frame `b` lies between frames `a` and `c`, as every frame of a mix does: going through it
+ * adds little to the per-pixel distance from `a` to `c`. A linear mix adds nothing; motion inside the
+ * shots adds up to how far they move on their own over the same span, measured before `a` and after
+ * `c`. A detour through another picture, such as black between two shots, adds far more.
+ */
+const between = (thumbs: ReadonlyArray<Gray>, a: number, b: number, c: number): boolean => {
+  const d = (i: number, j: number) => meanAbsDiff(thumbs[i]!, thumbs[j]!)
+  const span = c - a
+  const own = Math.max(a - span >= 0 ? d(a - span, a) : 0, c + span < thumbs.length ? d(c, c + span) : 0)
+  return d(a, b) + d(b, c) - d(a, c) <= BETWEEN_MARGIN * d(a, c) + own
+}
+
+/**
  * The fade across `a..b`, if every frame is a mix of the two ends moving steadily from one to the
  * other. Its ends are trimmed to the last frame still all outgoing and the first frame all incoming.
  */
@@ -219,13 +234,18 @@ const fades = (scan: Scan, floor: number): Array<Found> => {
       if (fade && toneChange(fade.from, fade.to) >= tone) found.push(fade)
     }
   }
-  // Overlapping windows found the same fade: keep their union. Fades that only touch (out to black,
-  // then in from it) stay apart.
+  // Windows that found the same transition: keep their union. That is any overlap, and also a fade
+  // starting just after another ends when the first one's end lies between its start and the second
+  // one's end (a short window inside a dissolve's tail sees a fade from an already-mixed picture). Out
+  // to black, a held black, then in from it detours through black, so it stays two fades.
   found.sort((x, y) => x.from - y.from)
   const merged: Array<{ from: number; to: number }> = []
   for (const x of found) {
     const last = merged[merged.length - 1]
-    if (last && x.from < last.to) merged[merged.length - 1] = { from: last.from, to: Math.max(last.to, x.to) }
+    const continues =
+      last !== undefined &&
+      (x.from < last.to || (x.from - last.to <= FADE_MIN_FRAMES && between(thumbs, last.from, last.to, x.to)))
+    if (continues) merged[merged.length - 1] = { from: last.from, to: Math.max(last.to, x.to) }
     else merged.push(x)
   }
   return merged.map(({ from, to }) => ({

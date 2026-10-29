@@ -162,4 +162,13 @@ describe("page transitions in a UI recording", () => {
       ])
     })
   )
+
+  it.effect("a dip to black with no black held is one transition, as an editor calls it", () =>
+    Effect.gen(function* () {
+      const cuts = yield* cutsIn((i) =>
+        i < 48 ? mixed(lightPage, black, ramp(i, 30, 48)) : mixed(black, settings(false), ramp(i, 48, 66))
+      )
+      expect(cuts.map((c) => c.kind)).toEqual(["fade"])
+    })
+  )
 })

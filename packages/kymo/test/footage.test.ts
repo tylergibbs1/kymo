@@ -51,6 +51,23 @@ describe("cuts in encoded footage", () => {
       expect(yield* cutsOf(source)).toEqual(["fade"])
     }).pipe(Effect.provide(fresh))
   )
+
+  it.effect("finds the 60 fps dissolve as one fade at every encode quality, not one plus its tail", () =>
+    Effect.gen(function* () {
+      // Encoder rounding decides whether a window inside the dissolve's tail looks like a fade of its
+      // own; the answer must not depend on it.
+      for (const crf of [18, 19, 21, 22, 26, 28]) {
+        const source = dissolve(clips, `dissolve-60-crf${crf}`, {
+          fps: 24,
+          offset: 2,
+          seconds: 1,
+          then: ["fps=60"],
+          crf
+        })
+        expect(yield* cutsOf(source), `crf ${crf}`).toEqual(["fade"])
+      }
+    }).pipe(Effect.provide(fresh))
+  )
 })
 
 describe("scan's budget", () => {

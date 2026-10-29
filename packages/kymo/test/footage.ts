@@ -128,6 +128,8 @@ export const dissolve = (
     readonly offset: number
     readonly seconds: number
     readonly then?: ReadonlyArray<string>
+    /** x264 quality of the final encode. Default 20. */
+    readonly crf?: number
   }
 ): string => {
   const total = Math.ceil((2 * options.offset + options.seconds) * options.fps)
@@ -145,7 +147,7 @@ export const dissolve = (
     "-c:v",
     "libx264",
     "-crf",
-    "20",
+    String(options.crf ?? 20),
     out
   )
   return out
