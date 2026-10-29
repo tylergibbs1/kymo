@@ -131,6 +131,23 @@ describe("easing fit never invents a curve", () => {
     })
   )
 
+  it.effect("a dip that returns to where it started is no motion, not a crash", () =>
+    Effect.gen(function* () {
+      const range = yield* FrameRange.whole(source.timeline)
+      // An opacity that wobbles below 1 while the subject moves, and comes back to 1.
+      const dip: Track = {
+        name: "box.opacity",
+        unit: "ratio",
+        samples: Array.from({ length: frames }, (_, i) =>
+          i < 10 || i > 40 ? 1 : i % 3 === 0 ? 0.87 : i % 3 === 1 ? 0.94 : 0.89
+        )
+      }
+      const r = unfit(fitEasing(dip, range))
+      expect(r.status).toBe("no-motion")
+      expect(r.reason).toContain("returns")
+    })
+  )
+
   it.effect("a motion over fewer than 6 frames has too few samples to fit", () =>
     Effect.gen(function* () {
       const range = yield* FrameRange.whole(source.timeline)

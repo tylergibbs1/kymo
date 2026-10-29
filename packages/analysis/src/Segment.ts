@@ -370,11 +370,16 @@ const motionOf = (
     latest: s[0],
     value: s[1]
   })
-  return Result.succeed({
-    track: name,
-    unit,
-    samples,
-    start: start === "range" ? exact(samples[0]!) : start,
-    end: end === "range" ? exact(samples[samples.length - 1]!) : end
-  })
+  const from = start === "range" ? exact(samples[0]!) : start
+  const to = end === "range" ? exact(samples[samples.length - 1]!) : end
+  // An easing takes a value from one rest to another: a value that leaves and comes back (a dip, a
+  // pulse) has no curve from start to end.
+  if (from.seen && to.seen && Math.abs(to.value - from.value) < unitScale(unit).minTravel)
+    return unfit(
+      "no-motion",
+      `${name} returns to where it started (${fmt(from.value)} to ${fmt(to.value)} ${unit}): it moves and comes back, which no single easing describes.`,
+      moving[0]![0],
+      moving[moving.length - 1]![0]
+    )
+  return Result.succeed({ track: name, unit, samples, start: from, end: to })
 }

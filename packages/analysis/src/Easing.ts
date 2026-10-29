@@ -1,5 +1,5 @@
 import { FrameRef, type Track, fpsOf } from "@kymo/core"
-import { Result, Schema } from "effect"
+import { Array as Arr, Result, Schema } from "effect"
 import { type Bezier, PRESETS, type Preset, bezierAt, minimize, springAt } from "./Curves.ts"
 import type { FrameRange } from "./Range.ts"
 import {
@@ -201,7 +201,8 @@ const fitter = (motion: WholeMotion, fps: number, minTravel: number) => {
     return solve(shape(params), t0, t1)?.rmse ?? 1e6
   }
 
-  const fit = (family: Family): Solved => {
+  /** The family's best fit; undefined when none of its shapes travels at least `minTravel`. */
+  const fit = (family: Family): Solved | undefined => {
     const nShape = family.starts[0]!.length
     const objective = (p: ReadonlyArray<number>) => {
       const { t0, t1 } = times(p, nShape)
@@ -236,9 +237,7 @@ const fitter = (motion: WholeMotion, fps: number, minTravel: number) => {
     }
     const { t0, t1 } = times(point, nShape)
     const solved = solve(family.shape(point.slice(0, nShape)), t0, t1)
-    return solved === undefined
-      ? { params: point.slice(0, nShape), t0, t1, v0: Number.NaN, v1: Number.NaN, rmse: Infinity }
-      : { ...solved, params: point.slice(0, nShape) }
+    return solved === undefined ? undefined : { ...solved, params: point.slice(0, nShape) }
   }
   return { fit, score }
 }
@@ -268,19 +267,18 @@ const INDISTINCT = 0.0025
  * when every candidate did.
  */
 const pickBest = <C extends { readonly candidate: EasingCandidate; readonly pinned: boolean }>(
-  all: ReadonlyArray<C>,
+  all: Arr.NonEmptyReadonlyArray<C>,
   samples: number
 ): C => {
   const free = all.filter((c) => !c.pinned)
-  const pool = free.length > 0 ? free : all
+  const pool = Arr.isReadonlyArrayNonEmpty(free) ? free : all
   const bic = (c: EasingCandidate) =>
     2 * samples * Math.log(Math.max(INDISTINCT, c.rmse)) + complexity(c) * Math.log(samples)
-  return [...pool].sort(
-    (a, b) =>
-      bic(a.candidate) - bic(b.candidate) ||
-      complexity(a.candidate) - complexity(b.candidate) ||
-      a.candidate.rmse - b.candidate.rmse
-  )[0]!
+  const order = (a: C, b: C) =>
+    bic(a.candidate) - bic(b.candidate) ||
+    complexity(a.candidate) - complexity(b.candidate) ||
+    a.candidate.rmse - b.candidate.rmse
+  return pool.reduce((best, c) => (order(c, best) < 0 ? c : best), Arr.headNonEmpty(pool))
 }
 
 /** Spring start points: a grid over damping ratio and cycles per motion, for the simplex to polish. */
@@ -315,15 +313,19 @@ export const fitMotion = (motion: WholeMotion, range: FrameRange): Result.Result
   const last = motion.samples[motion.samples.length - 1]![0]
   const seconds = Math.max(1, last - first) / fps
 
-  const presets = (Object.keys(PRESETS) as Array<Preset>).map((family) => {
+  const presets = (Object.keys(PRESETS) as Array<Preset>).flatMap((family) => {
     const kind: Family = { shape: () => (x) => bezierAt(PRESETS[family], x), starts: [[]], step: [] }
     const solved = fit.fit(kind)
-    return {
-      candidate: { family, css: family, rmse: solved.rmse } as EasingCandidate,
-      solved,
-      kind,
-      pinned: false
-    }
+    return solved === undefined
+      ? []
+      : [
+          {
+            candidate: { family, css: family, rmse: solved.rmse } as EasingCandidate,
+            solved,
+            kind,
+            pinned: false
+          }
+        ]
   })
   const bezierKind: Family = {
     shape: (p) => {
@@ -344,20 +346,9 @@ export const fitMotion = (motion: WholeMotion, range: FrameRange): Result.Result
     step: [0.2, 0.1]
   }
   const spring = fit.fit(springKind)
-  const b = toBezier(bezier.params)
-  const omega = Math.exp(spring.params[0]!)
-  const zeta = clamp(spring.params[1]!, 0.02, 4)
-  // A spring never arrives: it ends where it stays within REST of its target, or where last seen.
-  let settle = spring.t0
-  for (let i = last; i >= spring.t0; i--) {
-    if (Math.abs(1 - springAt({ omega, zeta }, (i - spring.t0) / fps)) > SETTLED) {
-      settle = Math.min(last, i + 1)
-      break
-    }
-  }
-  const candidates = [
-    ...presets,
-    {
+  const bezierCandidate = (solved: Solved) => {
+    const b = toBezier(solved.params)
+    return {
       candidate: {
         family: "cubic-bezier",
         css: cssOf(b),
@@ -365,13 +356,25 @@ export const fitMotion = (motion: WholeMotion, range: FrameRange): Result.Result
         y1: round(b.y1, 3),
         x2: round(b.x2, 3),
         y2: round(b.y2, 3),
-        rmse: bezier.rmse
+        rmse: solved.rmse
       } as EasingCandidate,
-      solved: bezier,
+      solved,
       kind: bezierKind,
       pinned: [b.y1, b.y2].some((y) => y <= -2 || y >= 3)
-    },
-    {
+    }
+  }
+  const springCandidate = (solved: Solved) => {
+    const omega = Math.exp(solved.params[0]!)
+    const zeta = clamp(solved.params[1]!, 0.02, 4)
+    // A spring never arrives: it ends where it stays within REST of its target, or where last seen.
+    let settle = solved.t0
+    for (let i = last; i >= solved.t0; i--) {
+      if (Math.abs(1 - springAt({ omega, zeta }, (i - solved.t0) / fps)) > SETTLED) {
+        settle = Math.min(last, i + 1)
+        break
+      }
+    }
+    return {
       candidate: {
         family: "spring",
         stiffness: round(omega * omega, 2),
@@ -379,16 +382,26 @@ export const fitMotion = (motion: WholeMotion, range: FrameRange): Result.Result
         mass: 1,
         dampingRatio: round(zeta, 3),
         frequencyHz: round(omega / (2 * Math.PI), 3),
-        rmse: spring.rmse
+        rmse: solved.rmse
       } as EasingCandidate,
-      solved: { ...spring, t1: settle },
+      solved: { ...solved, t1: settle },
       kind: springKind,
       pinned: zeta <= 0.02 || zeta >= 4
     }
+  }
+  const candidates = [
+    ...presets,
+    ...(bezier === undefined ? [] : [bezierCandidate(bezier)]),
+    ...(spring === undefined ? [] : [springCandidate(spring)])
   ]
-    .filter((c) => Number.isFinite(c.candidate.rmse))
     .map((c) => ({ ...c, candidate: { ...c.candidate, rmse: round(c.candidate.rmse, 5) } }))
     .sort((a, b) => a.candidate.rmse - b.candidate.rmse)
+  if (!Arr.isReadonlyArrayNonEmpty(candidates))
+    return Result.fail({
+      track: motion.track,
+      status: "no-motion",
+      reason: `No curve moves ${motion.track} by the ${minTravel} ${motion.unit} that counts as motion between its ends.`
+    })
   const best = pickBest(candidates, motion.samples.length)
 
   // An unseen end with a wide window: refit the best family with that frame fixed at each frame of
@@ -407,7 +420,7 @@ export const fitMotion = (motion: WholeMotion, range: FrameRange): Result.Result
     for (let t = Math.ceil(e.earliest); t <= Math.floor(e.latest); t++) {
       const fixed: WholeMotion = { ...motion, [side]: { ...e, earliest: t, latest: t } }
       const refit = fitter(fixed, fps, minTravel).fit({ ...best.kind, starts: [best.solved.params] })
-      if (refit.rmse <= tolerance) good.push(t)
+      if (refit !== undefined && refit.rmse <= tolerance) good.push(t)
     }
     if (good.length > 0 && good[good.length - 1]! - good[0]! > UNDETERMINED) {
       const lo = good[0]!
