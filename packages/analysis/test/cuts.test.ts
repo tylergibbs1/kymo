@@ -172,3 +172,53 @@ describe("page transitions in a UI recording", () => {
     })
   )
 })
+
+/** A small blue spinner turning near the middle, so the page is never still. */
+const spinning = (scene: Scene, i: number): Scene => ({
+  ...scene,
+  rects: [
+    ...(scene.rects ?? []),
+    { x: 28 + 3 * Math.cos(i / 3), y: 20 + 3 * Math.sin(i / 3), w: 4, h: 4, rgb: [40, 80, 220] }
+  ]
+})
+
+describe("flashes are not transitions", () => {
+  it.effect("a white flash on a light page with a spinner is no cut, for one frame or a few", () =>
+    Effect.gen(function* () {
+      for (const flashed of [[60], [60, 61], [60, 61, 62]]) {
+        const cuts = yield* cutsIn((i) => spinning(flashed.includes(i) ? white : lightPage, i))
+        expect({ flashed, cuts }).toEqual({ flashed, cuts: [] })
+      }
+    })
+  )
+
+  it.effect("a flash inside or at either end of a dissolve leaves the dissolve's ends alone", () =>
+    Effect.gen(function* () {
+      // A flash on 81, the frame the fade completes, hides it: 82 is the first frame seen whole.
+      for (const [at, to] of [
+        [71, 81],
+        [76, 81],
+        [81, 82],
+        [82, 81]
+      ]) {
+        const cuts = yield* cutsIn((i) =>
+          spinning(i === at ? white : mixed(lightPage, settings(true), ramp(i, 72, 81)), i)
+        )
+        const found = cuts.map((c) => [c.kind, c.from.index, c.incoming.index, c.to.index])
+        expect({ at, found }).toEqual({ at, found: [["fade", 72, 73, to]] })
+      }
+    })
+  )
+
+  it.effect("a hard cut next to a flash is one cut at the new picture", () =>
+    Effect.gen(function* () {
+      for (const at of [59, 60]) {
+        const cuts = yield* cutsIn((i) => spinning(i === at ? white : i < 60 ? lightPage : settings(true), i))
+        expect({ at, found: cuts.map((c) => [c.kind, c.incoming.index]) }).toEqual({
+          at,
+          found: [["hard", at === 59 ? 60 : 61]]
+        })
+      }
+    })
+  )
+})

@@ -57,6 +57,29 @@ describe("cuts, motion and flicker", () => {
     })
   )
 
+  it.effect("rates a flicker by how much of the frame flashes, not how far the mean luma moves", () =>
+    Effect.gen(function* () {
+      const lightPage: Scene = {
+        background: [238, 241, 245],
+        rects: [{ x: 3, y: 8, w: 40, h: 2, rgb: [150, 160, 175] }]
+      }
+      const darkPage: Scene = { background: [27, 31, 42] }
+      const severity = (scene: (i: number) => Scene) =>
+        Effect.gen(function* () {
+          const flashing = fakeSource({ frames: 40, scene })
+          const range = yield* FrameRange.whole(flashing.timeline)
+          const report = yield* check({ source: flashing, range, rules: ["flicker"] })
+          return report.findings.map((f) => [f.index, f.severity])
+        })
+      // The whole light page goes white: a small step in mean luma, but every pixel flashes.
+      expect(yield* severity((i) => (i === 20 ? white : lightPage))).toEqual([[20, "error"]])
+      expect(yield* severity((i) => (i === 20 ? white : darkPage))).toEqual([[20, "error"]])
+      // A tenth of a dark page flashes white: a bigger step in mean luma, but a local blink.
+      const blink: Scene = { ...darkPage, rects: [{ x: 0, y: 0, w: 64, h: 5, rgb: [255, 255, 255] }] }
+      expect(yield* severity((i) => (i === 20 ? blink : darkPage))).toEqual([[20, "warning"]])
+    })
+  )
+
   it.effect("flags the flash as flicker at the exact frame", () =>
     Effect.gen(function* () {
       const range = yield* FrameRange.whole(source.timeline)

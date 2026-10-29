@@ -1,16 +1,30 @@
 import { Address } from "@kymo/core"
 import { BLACK, type PixelInput, runs } from "./FrameTiming.ts"
 import { type Finding, finding } from "./Finding.ts"
+import { levelsAbove } from "./Pixels.ts"
+import { noiseLevelOf } from "./Signals.ts"
+import { VISIBLE_STEP } from "./Visible.ts"
 
 export { type PixelInput, droppedFrames, duplicateFrames } from "./FrameTiming.ts"
 
 /** A flicker steps luma at least this much and then comes back. */
 const FLICKER_STEP = 0.06
-const FLICKER_ERROR = 0.2
+/**
+ * A flicker is an error when at least this share of the frame flashes (changes visibly into the
+ * flash and back out of it), whatever the page's brightness: a white flash on a light page moves the
+ * mean luma little but wipes the whole page. Below it, a local blink, it is a warning.
+ */
+const FLICKER_ERROR_AREA = 0.25
 
 export const flicker = ({ scan }: PixelInput): Array<Finding> => {
   const { range } = scan
   const l = scan.frames.map((f) => f.luma)
+  const levels = scan.frames.flatMap((f) => (f.levels === null ? [] : [f.levels]))
+  const floor = Math.max(VISIBLE_STEP, noiseLevelOf(levels))
+  const changed = (k: number) => {
+    const lv = scan.frames[k]?.levels
+    return lv == null ? 0 : levelsAbove(lv, floor)
+  }
   return l.flatMap((v, k) => {
     const before = l[k - 1]
     const after = l[k + 1]
@@ -25,12 +39,13 @@ export const flicker = ({ scan }: PixelInput): Array<Finding> => {
     ]
     if (calm.some((d) => Math.abs(d) > 0.25 * step)) return []
     const i = range.first + k
+    const area = Math.min(changed(k), changed(k + 1))
     return [
       finding(range, {
         rule: "flicker",
-        severity: step >= FLICKER_ERROR ? "error" : "warning",
+        severity: area >= FLICKER_ERROR_AREA ? "error" : "warning",
         index: i,
-        message: `${Address.label(range.rate, i)} is ${up > 0 ? "brighter" : "darker"} than both neighbours by ${(step * 100).toFixed(0)}% luma for one frame: a flicker.`,
+        message: `${Address.label(range.rate, i)} is ${up > 0 ? "brighter" : "darker"} than both neighbours by ${(step * 100).toFixed(0)}% luma for one frame, over ${(area * 100).toFixed(0)}% of the frame: a flicker.`,
         view: "diff"
       })
     ]

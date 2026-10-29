@@ -67,8 +67,12 @@ const TONE_MIN = 0.1
  */
 const MIX_VISIBLE = 0.01
 const MIX_DRIFT_MARGIN = 3
-/** A flash is one frame that differs from both its neighbours by this multiple of how much they differ. */
+/** A flash differs from the frames on both sides of it by this multiple of how much they differ. */
 const FLASH_RETURN = 2
+/** A flash lasts at most this long (4 frames at 60 fps, 1 at 24): longer, and it is a shot. */
+const FLASH_MAX_SECONDS = 1 / 15
+/** A flash starts or ends at once: the frame next to it is at least this far (as a share) from its picture as the one beyond. */
+const FLASH_SUDDEN = 0.8
 /** How much a still picture may add to the way between two others, as a share of it, and still lie between them. */
 const BETWEEN_MARGIN = 0.25
 
@@ -92,20 +96,50 @@ const coarseFloor = (scan: Scan, coarse: ReadonlyArray<number>): number => {
 }
 
 /**
- * One-frame flashes (a white frame, a glitch) belong to neither shot: the picture returns on the next
- * frame. Transitions are read with each flash replaced by the frame before it, so no detector can take
- * a flash for a cut, for the end of a fade or for a step of its mix.
+ * Flashes (a white frame, a glitch) belong to neither shot: for a moment the picture is something
+ * else, then it returns. Each is a run of at most `FLASH_MAX_SECONDS` whose every frame differs from
+ * the frames on both sides of it by `FLASH_RETURN` times as much as those two differ from each other,
+ * and that starts or ends at once rather than being approached.
+ * Runs are scan positions, both ends included; one-frame runs are tried first.
+ */
+export const flashRuns = (scan: Scan): Array<readonly [number, number]> => {
+  const f = scan.frames
+  const longest = Math.max(1, Math.floor(FLASH_MAX_SECONDS * fpsOf(scan.range.rate)))
+  const out: Array<readonly [number, number]> = []
+  for (let k = 1; k + 1 < f.length; k++) {
+    for (let n = 1; n <= longest && k + n < f.length; n++) {
+      const d = (i: number, j: number) => (i < 0 || j >= f.length ? 0 : meanAbsDiff(f[i]!.thumb, f[j]!.thumb))
+      let away = Infinity
+      for (let j = k; j < k + n; j++) away = Math.min(away, d(k - 1, j), d(j, k + n))
+      // Sudden on one side at least: the frame next to it is no nearer its picture than the one
+      // before that. The frames leading into the trough of a dip to black are already darkening.
+      const ratio = (near: number, far: number) => (far <= 0 ? 1 : near / far)
+      const sudden = Math.max(
+        k < 2 ? 1 : ratio(d(k - 1, k), d(k - 2, k)),
+        k + n + 1 >= f.length ? 1 : ratio(d(k + n - 1, k + n), d(k + n - 1, k + n + 1))
+      )
+      if (away > 0 && FLASH_RETURN * d(k - 1, k + n) < away && sudden >= FLASH_SUDDEN) {
+        out.push([k, k + n - 1])
+        k += n
+        break
+      }
+    }
+  }
+  return out
+}
+
+/**
+ * Transitions are read with each flash replaced by the frame before it, so no detector can take a
+ * flash for a cut, for the end of a fade or for a step of its mix.
  */
 const withoutFlashes = (scan: Scan): Scan => {
-  const f = scan.frames
-  const out = [...f]
-  for (let k = 1; k + 1 < f.length; k++) {
-    const before = out[k - 1]!
-    const [here, after] = [f[k]!, f[k + 1]!]
-    const away = Math.min(meanAbsDiff(before.thumb, here.thumb), meanAbsDiff(here.thumb, after.thumb))
-    if (away <= 0 || FLASH_RETURN * meanAbsDiff(before.thumb, after.thumb) >= away) continue
-    out[k] = { ...here, thumb: before.thumb, histogram: before.histogram, histDiff: 0, thumbDiff: 0 }
-    out[k + 1] = {
+  const out = [...scan.frames]
+  for (const [a, b] of flashRuns(scan)) {
+    const before = out[a - 1]!
+    for (let j = a; j <= b; j++)
+      out[j] = { ...out[j]!, thumb: before.thumb, histogram: before.histogram, histDiff: 0, thumbDiff: 0 }
+    const after = out[b + 1]!
+    out[b + 1] = {
       ...after,
       histDiff: histogramDistance(before.histogram, after.histogram),
       thumbDiff: meanAbsDiff(before.thumb, after.thumb)
