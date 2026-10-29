@@ -9,6 +9,8 @@ export {
   frameDifferences,
   isChanged
 } from "./Difference.ts"
+export { type BoxChange, type FrameChange, type Span, boxChange, pairChanges } from "./Change.ts"
+export { VISIBLE_STEP } from "./Visible.ts"
 export { MOTION_TRACK, Motion, MotionPeak, MotionWindow, motionEnergy } from "./Motion.ts"
 export { Budget, type Sample, type SampleRequest, SampleStrategy, parseBudget, sample } from "./Sampling.ts"
 export {

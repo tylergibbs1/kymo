@@ -27,6 +27,12 @@ export interface Scene {
   readonly rects?: ReadonlyArray<{ x: number; y: number; w: number; h: number; rgb: Rgb; alpha?: number }>
   /** Another scene composited over this one as a whole at `alpha`, as a page cross-fades over another. */
   readonly over?: { readonly scene: Scene; readonly alpha: number }
+  /**
+   * Encoder-like noise over the whole picture, up to `amplitude` levels either way, in a pattern
+   * of 4x4 blocks chosen by `seed`: give consecutive frames different seeds, as an encoder re-codes a
+   * still picture block by block.
+   */
+  readonly grain?: { readonly amplitude: number; readonly seed: number }
 }
 
 const hash = (x: number, y: number) => {
@@ -68,6 +74,16 @@ export const draw = (scene: Scene, width = W, height = H): RgbImage => {
     const a = scene.over.alpha
     for (let p = 0; p < d.length; p++) d[p] = Math.round(a * top[p]! + (1 - a) * d[p]!)
   }
+  const grain = scene.grain
+  if (grain !== undefined)
+    for (let y = 0; y < height; y++)
+      for (let x = 0; x < width; x++) {
+        const n = Math.round((hash((x >> 2) + 7919 * grain.seed, y >> 2) - 0.5) * 2 * grain.amplitude)
+        for (let c = 0; c < 3; c++) {
+          const p = (y * width + x) * 3 + c
+          d[p] = Math.max(0, Math.min(255, d[p]! + n))
+        }
+      }
   return img
 }
 

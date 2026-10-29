@@ -171,7 +171,8 @@ describe("diff", () => {
         frames: indices(10),
         outDir: dir,
         labelStyle: "both",
-        target: standard
+        target: standard,
+        floor: 5
       })).images
       expect(basename(stillImage!.path)).toBe("10f.diff.png")
       const quiet = yield* pixels(stillImage!.path)
@@ -183,9 +184,25 @@ describe("diff", () => {
         frames: indices(10),
         outDir: dir,
         labelStyle: "both",
-        target: standard
+        target: standard,
+        floor: 5
       })).images
       expect(brightest(yield* pixels(movingImage!.path), 0, 0, 320, 180)).toBeGreaterThan(100)
+    }).pipe(Effect.scoped)
+  )
+
+  it.effect("draws encoder noise black, so only real change shows", () =>
+    Effect.gen(function* () {
+      const dir = yield* tempDir
+      const [image] = (yield* diff({
+        source: fakeSource({ squareX: () => 100, noise: 4 }),
+        frames: indices(10),
+        outDir: dir,
+        labelStyle: "both",
+        target: standard,
+        floor: 5
+      })).images
+      expect(brightest(yield* pixels(image!.path), 0, 0, 320, 180)).toBeLessThan(8)
     }).pipe(Effect.scoped)
   )
 
@@ -198,7 +215,8 @@ describe("diff", () => {
           frames: indices(0, 5),
           outDir: dir,
           labelStyle: "both",
-          target: standard
+          target: standard,
+          floor: 5
         })
       )
       expect(e._tag).toBe("InvalidInput")
@@ -253,7 +271,15 @@ describe("compare", () => {
       const b = fakeSource({ handle: "clip2" })
       const frames = indices(0, 50, 250)
       const pairs = frames.map((i) => ({ a: i, b: i }))
-      const side = yield* compare({ a, b, pairs, outDir: dir, labelStyle: "both", target: standard })
+      const side = yield* compare({
+        a,
+        b,
+        pairs,
+        floor: 20,
+        outDir: dir,
+        labelStyle: "both",
+        target: standard
+      })
       expect(basename(side.images[0]!.path)).toBe("0f-08s10f.compare.clip1.clip2.png")
       const sideImg = yield* pixels(side.images[0]!.path)
       expect(sideImg.width).toBeGreaterThanOrEqual(2 * 320)
@@ -261,6 +287,7 @@ describe("compare", () => {
         a,
         b,
         pairs,
+        floor: 20,
         outDir: dir,
         labelStyle: "both",
         target: standard,

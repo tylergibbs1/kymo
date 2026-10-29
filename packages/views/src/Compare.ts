@@ -24,6 +24,8 @@ export interface CompareOptions extends Paging {
   /** The frames to compare: each frame of A with its frame of B. */
   readonly pairs: ReadonlyArray<FramePair>
   readonly mode?: CompareMode
+  /** In diff mode, levels (0..255) of difference drawn black: encoding noise between the two. */
+  readonly floor: number
   readonly outDir: string
   readonly target: Target
   readonly labelStyle: Address.LabelStyle
@@ -95,7 +97,7 @@ export const compare = Effect.fn("compare")(function* (
         mode === "diff"
           ? yield* Effect.forEach(fromA, (fa, k) =>
               Effect.map(resize(fromB[k]!.image, fa.image.width, fa.image.height), (b) =>
-                heatmap(fa.image, b)
+                heatmap(fa.image, b, o.floor)
               )
             )
           : fromA.flatMap((fa, k) => [fa.image, fromB[k]!.image])

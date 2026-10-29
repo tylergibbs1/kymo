@@ -47,7 +47,7 @@ export type Assertion =
     }
 
 const EXAMPLES =
-  "e.g. `box.x <= 600 at 1s`, `#hero.opacity >= 0.99 by 500ms`, `motion < 0.01 after @settle` or `@impact within #40..#50`"
+  "e.g. `box.x <= 600 at 1s`, `#hero.opacity >= 0.99 by 500ms`, `box.change == 0 after @settle` or `@impact within #40..#50`"
 
 const TRACK = String.raw`[#.]?[A-Za-z_][\w-]*(?:\.[A-Za-z_][\w-]*)*`
 const NUMBER = String.raw`-?(?:\d+(?:\.\d*)?|\.\d+)`

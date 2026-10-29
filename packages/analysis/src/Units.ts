@@ -10,7 +10,8 @@ interface UnitScale {
 const SCALES: Readonly<Record<string, UnitScale>> = {
   px: { noise: 0.5, minTravel: 2 },
   "0..1": { noise: 0.01, minTravel: 0.02 },
-  ratio: { noise: 0.01, minTravel: 0.02 },
+  // A measured opacity (a tracked box's contrast) wobbles by about 0.02 on H.264 footage.
+  ratio: { noise: 0.03, minTravel: 0.05 },
   levels: { noise: 0.5, minTravel: 2 }
 }
 

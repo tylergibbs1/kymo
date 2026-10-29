@@ -19,12 +19,17 @@ export interface DiffOptions extends Paging {
   readonly source: Source
   /** Each frame N is drawn as |N − (N−1)|, labelled with N's address. */
   readonly frames: ReadonlyArray<FrameIndex>
+  /** Levels (0..255) of change drawn black: the clip's noise. Above it the colour scale is fixed. */
+  readonly floor: number
   readonly outDir: string
   readonly target: Target
   readonly labelStyle: Address.LabelStyle
 }
 
-/** What changed since the previous frame, as heatmaps (black = no change), written as `<span>.diff.png`. */
+/**
+ * What changed since the previous frame, as heatmaps on a fixed scale (black = no change beyond
+ * `floor`), written as `<span>.diff.png`.
+ */
 export const diff = Effect.fn("diff")(function* (o: DiffOptions): Effect.fn.Return<ViewResult, KymoError> {
   const { timeline } = o.source
   yield* checkFrames(o.source, o.frames)
@@ -64,7 +69,7 @@ export const diff = Effect.fn("diff")(function* (o: DiffOptions): Effect.fn.Retu
             width: plan.width,
             height: plan.height,
             tiles: current.map((f, k) => ({
-              image: heatmap(byIndex.get(f.index - 1)!.image, f.image),
+              image: heatmap(byIndex.get(f.index - 1)!.image, f.image, o.floor),
               rect: plan.cells[k]!.frame
             })),
             overlay: plan.cells

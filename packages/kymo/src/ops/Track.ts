@@ -1,4 +1,5 @@
 import {
+  type BoxChange,
   EasingFit,
   FrameRange,
   LostReason,
@@ -26,7 +27,7 @@ import { BoxText, Format, Range, Source as SourceField, TargetInput } from "../F
 import { analysisRange, resolveAddresses } from "../Frames.ts"
 import { define } from "../Operation.ts"
 import { OutputDir } from "../OutputDir.ts"
-import { measureBox } from "../Region.ts"
+import { measureBox, measureChange } from "../Region.ts"
 import { Sheet, sheetOf } from "../Sheets.ts"
 
 const fields = {
@@ -34,7 +35,7 @@ const fields = {
   props: Schema.optionalKey(
     Schema.Array(Schema.String).annotate({
       description:
-        "Which values to return. With box: x, y, w, h, confidence (default x, y, confidence). Without: names of the source's own tracks from probe, e.g. box.x (default all)."
+        "Which values to return. With box: x, y, w, h, confidence, opacity (how much of its contrast at the anchor frame the subject shows, 1 at the anchor: a fade), change (the fraction of the box that visibly changed since the previous frame, with when it starts and settles) (default x, y, confidence). change alone measures the box where it is on screen and does not follow the subject. Without box: names of the source's own tracks from probe, e.g. box.x (default all)."
     })
   ),
   range: Schema.optionalKey(
@@ -85,6 +86,40 @@ type TrackInput = typeof TrackInput.Type
 
 const Keyframe = Schema.Struct({ address: Schema.String, index: FrameIndex, value: Schema.Number })
 
+const Run = Schema.Struct({
+  range: Schema.String.annotate({ description: "The frames, e.g. 13f..29f." }),
+  frames: Schema.Int.annotate({ description: "How many frames that is." })
+})
+
+export const ChangeSummary = Schema.Struct({
+  box: Schema.String.annotate({
+    description:
+      "The region measured, x,y,w,h in source pixels: the box as given, fixed on screen (it does not follow the subject)."
+  }),
+  floor: Schema.Number.annotate({
+    description:
+      "Luma steps (0..255) a pixel had to change by to count: 5 (2% of full scale), or this clip's own noise inside the box when that is larger. An edge also had to move by half a pixel or more."
+  }),
+  starts: Schema.NullOr(Schema.String).annotate({
+    description: "The first frame that visibly differs from the range's first frame; null if none does."
+  }),
+  settles: Schema.NullOr(Schema.String).annotate({
+    description:
+      "The first frame from which every frame looks like the range's last frame: where the box reaches its final look. null when the last frame still differs from the one before it (still changing at the end of the range)."
+  }),
+  changing: Schema.Array(Run).annotate({
+    description:
+      "Runs of frames that visibly differ from the frame before them, in order. The value at frame N compares N with N-1, so a run's last frame is where that change finished."
+  }),
+  discounted: Schema.Array(Run).annotate({
+    description:
+      "Runs of frames where the page around the box dimmed or brightened as a whole (a scrim, a backdrop): that tone change was taken out of the box's change. Empty when the surroundings stayed put."
+  })
+}).annotate({
+  description: "With props change: when the box visibly changes, measured against the clip's noise."
+})
+type ChangeSummary = typeof ChangeSummary.Type
+
 export const TrackSeries = Schema.Struct({
   name: Schema.String,
   unit: Schema.String,
@@ -119,6 +154,7 @@ export const TrackOutput = Schema.Struct({
   }),
   tracks: Schema.Array(TrackSeries),
   plot: Schema.NullOr(Sheet),
+  change: Schema.optionalKey(ChangeSummary),
   easing: Schema.Array(EasingFit).annotate({
     description:
       "One fit per track whose whole motion was seen: each end at a rest, the range bound, or where the subject appeared or disappeared (then that end is estimated; see start and end)."
@@ -159,7 +195,7 @@ const summary = (track: Track, range: FrameRange, method: Measured["method"], ro
     min: Math.min(...values),
     max: Math.max(...values),
     keyframes:
-      role === "confidence"
+      role !== "value"
         ? []
         : keyframeIndices(track, range, precision).map((index) => ({
             address: Address.format(range.rate, index),
@@ -169,17 +205,28 @@ const summary = (track: Track, range: FrameRange, method: Measured["method"], ro
   }
 }
 
-const REGION_PROPS = ["x", "y", "w", "h", "confidence"] as const
+const REGION_PROPS = ["x", "y", "w", "h", "confidence", "opacity", "change"] as const
+type RegionProp = (typeof REGION_PROPS)[number]
+const isRegionProp = (p: string): p is RegionProp => (REGION_PROPS as ReadonlyArray<string>).includes(p)
+
+/** Measured only inside a box; asked for without one, the hint says how. */
+const BOX_ONLY: Readonly<Record<string, string>> = {
+  change: 'change is measured inside a box: pass box=x,y,w,h and props=["change"]',
+  opacity: 'opacity is measured on a tracked box: pass box=x,y,w,h and props=["opacity"]',
+  motion:
+    'whole-frame motion energy is scan\'s motion.energy (format=detailed); for change inside a region pass box=x,y,w,h and props=["change"]'
+}
 
 const CONCISE_NOTE = "Keyframes only; pass format=detailed for every frame."
 
-/** A value track, or the match quality of a measured box (summarised, never keyframed or eased). */
-type Role = "value" | "confidence"
+/** A value track, or a measured box's match quality or visible change (summarised, never keyframed or eased). */
+type Role = "value" | "confidence" | "change"
 
 interface Measured {
   readonly method: "source" | "template"
   readonly tracks: ReadonlyArray<{ readonly track: Track; readonly role: Role }>
   readonly region?: RegionTrack
+  readonly change?: BoxChange
 }
 
 /** The frames to measure and the frame the box describes. */
@@ -238,22 +285,31 @@ const measure = (input: TrackInput, source: Source, frames: Frames): Effect.Effe
         "Pass box=x,y,w,h in source pixels instead, e.g. box=120,80,64,64 (use view=grid in frames to find it)."
       )
     if ("box" in input) {
-      const region = yield* measureBox(source, frames.range, input.box, frames.anchor)
-      const byProp = { x: region.x, y: region.y, w: region.w, h: region.h, confidence: region.confidence }
-      const wanted = (input.props ?? ["x", "y", "confidence"]).map((p) => p.replace(/^box\./, ""))
-      const unknown = wanted.filter((p) => !(REGION_PROPS as ReadonlyArray<string>).includes(p))
+      const asked = (input.props ?? ["x", "y", "confidence"]).map((p) => p.replace(/^box\./, ""))
+      const unknown = asked.filter((p) => !isRegionProp(p))
       if (unknown.length > 0)
         return yield* invalid(
           `A tracked box has no ${unknown.join(", ")}.`,
           `Pick from ${REGION_PROPS.join(", ")}, e.g. props=["x","y"].`
         )
+      const wanted = asked.filter(isRegionProp)
+      // change is a place on screen, not the subject: it needs no tracking of its own.
+      const region = wanted.some((p) => p !== "change")
+        ? yield* measureBox(source, frames.range, input.box, frames.anchor)
+        : undefined
+      const change = wanted.includes("change")
+        ? yield* measureChange(source, frames.range, input.box)
+        : undefined
+      const picked = wanted.flatMap((p): Array<{ readonly track: Track; readonly role: Role }> => {
+        if (p === "change") return change === undefined ? [] : [{ track: change.track, role: "change" }]
+        if (region === undefined) return []
+        return [{ track: region[p], role: p === "confidence" ? "confidence" : "value" }]
+      })
       return {
         method: "template",
-        region,
-        tracks: wanted.map((p) => ({
-          track: byProp[p as keyof typeof byProp],
-          role: p === "confidence" ? ("confidence" as const) : ("value" as const)
-        }))
+        ...(region === undefined ? {} : { region }),
+        ...(change === undefined ? {} : { change }),
+        tracks: picked
       }
     }
     const names = input.props ?? timeline.tracks.map((t) => t.name)
@@ -262,9 +318,30 @@ const measure = (input: TrackInput, source: Source, frames: Frames): Effect.Effe
         `${timeline.handle} has no numeric tracks of its own.`,
         "Measure a region instead: pass box=x,y,w,h in source pixels, e.g. box=120,80,64,64."
       )
+    const own = new Set(timeline.tracks.map((t) => t.name))
+    const boxOnly = names.find((n) => !own.has(n) && BOX_ONLY[n] !== undefined)
+    if (boxOnly !== undefined)
+      return yield* invalid(`${timeline.handle} has no track "${boxOnly}".`, `${BOX_ONLY[boxOnly]}.`)
     const tracks = yield* Effect.forEach(names, (name) => source.track(name))
     return { method: "source", tracks: tracks.map((track) => ({ track, role: "value" as const })) }
   })
+
+/** The change summary as the output shows it. */
+const changeSummary = (c: BoxChange, range: FrameRange): ChangeSummary => {
+  const runs = (spans: BoxChange["changing"]) =>
+    spans.map((s) => ({
+      range: range.spanText(s.from.index, s.to.index),
+      frames: s.to.index - s.from.index + 1
+    }))
+  return {
+    box: [c.box.x, c.box.y, c.box.w, c.box.h].join(","),
+    floor: c.floor,
+    starts: c.starts?.address ?? null,
+    settles: c.settles?.address ?? null,
+    changing: runs(c.changing),
+    discounted: runs(c.discounted)
+  }
+}
 
 /** What to tell the caller about a lost box: a wrong box at the anchor, or the subject leaving or fading. */
 const lostNotes = (input: TrackInput, region: RegionTrack, frames: Frames, handle: string) => {
@@ -301,12 +378,13 @@ export const track = define({
   name: "track",
   title: "Measure motion",
   description:
-    "Measure motion as numbers: positions per frame of a region you name with box (template matching), or the source's own tracks (synthetic ground truth, telemetry). Returns keyframes (turning points: where it starts, stops and reverses, at exact frames); pass format=detailed for every frame's sample. Also an optional chart image, an optional easing fit (only for a motion seen whole; easingSkipped says why a track has none), and where a box was lost. The box must be where the subject is at the anchor frame: the first address of range, so a range written backwards (30f..12f) follows a box read at 30f back to 12f; or pass anchor. w and h are measured: they follow the subject's scale. Prefer these numbers over estimating positions from pixels; use check to test them against rules or assertions.",
+    "Measure motion as numbers: positions per frame of a region you name with box (template matching), its opacity (a fade), and how much of the box visibly changes each frame (props change: when something in it starts and settles, above the clip's encoder noise), or the source's own tracks (synthetic ground truth, telemetry). Returns keyframes (turning points: where it starts, stops and reverses, at exact frames); pass format=detailed for every frame's sample. Also an optional chart image, an optional easing fit (only for a motion seen whole; easingSkipped says why a track has none), and where a box was lost. The box must be where the subject is at the anchor frame: the first address of range, so a range written backwards (30f..12f) follows a box read at 30f back to 12f; or pass anchor. w and h are measured: they follow the subject's scale. Prefer these numbers over estimating positions from pixels; use check to test them against rules or assertions.",
   cost: "no images unless plot=true; then 1 chart image, ≤4784 visual tokens at high-res",
   examples: [
     { source: "synthetic:ease?easing=ease-out", props: ["box.x"], fitEasing: true },
     { source: "clips/launch.mp4", box: "120,80,64,64", range: "1s..3s", plot: true },
     { source: "clips/modal.mp4", box: "400,220,480,280", range: "30f..12f", fitEasing: true },
+    { source: "clips/toast.mp4", box: "916,80,340,64", props: ["change"] },
     { source: "clip1", props: ["box.x", "box.y"], format: "detailed" }
   ],
   input: TrackInput,
@@ -363,6 +441,11 @@ export const track = define({
     const span = range.spanText(range.first, range.last)
     const notes = [
       ...(measured.region === undefined ? [] : lostNotes(input, measured.region, frames, timeline.handle)),
+      ...(measured.change !== undefined && measured.change.settles === undefined
+        ? [
+            `The box still changes at the last frame, so it has not settled in ${span}; widen the range to see where it settles.`
+          ]
+        : []),
       ...skipped.map((u) => `No easing fit for ${u.track} (${u.status}): ${u.reason}`),
       ...(detailed ? [] : [CONCISE_NOTE])
     ]
@@ -371,6 +454,7 @@ export const track = define({
       range: range.spanText(range.first, range.last),
       method: measured.method,
       tracks: series,
+      ...(measured.change === undefined ? {} : { change: changeSummary(measured.change, range) }),
       plot:
         plotted === undefined
           ? null

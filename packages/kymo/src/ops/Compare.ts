@@ -124,6 +124,7 @@ export const compare = define({
       b,
       pairs,
       mode: input.view === "side" ? "side-by-side" : "diff",
+      floor: Math.round(NOISE * 255),
       outDir: yield* output.dirFor(ta.handle),
       target: input.target,
       labelStyle: style,

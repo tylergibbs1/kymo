@@ -1,5 +1,13 @@
-/** Measuring a region named by `box`: the one path track and check both take, so they agree. */
-import { type FrameRange, type RegionTrack, parseBox, trackRegion } from "@kymo/analysis"
+/** Measuring a region named by `box`: the one path track, check and frames take, so they agree. */
+import {
+  type Box,
+  type BoxChange,
+  type FrameRange,
+  type RegionTrack,
+  boxChange,
+  parseBox,
+  trackRegion
+} from "@kymo/analysis"
 import { Address, InvalidInput, type KymoError, type Size, type Source } from "@kymo/core"
 import { Effect } from "effect"
 
@@ -13,13 +21,8 @@ export const exampleBox = (size: Size): string =>
 export const findBoxHint = (source: Source, range: FrameRange): string =>
   `find it with kymo frames ${source.timeline.handle} --at ${Address.format(range.rate, range.first)} --view grid`
 
-/** Follow `box` (source pixels, as it is at `anchor`, default the range's first frame) through the range. */
-export const measureBox = (
-  source: Source,
-  range: FrameRange,
-  box: string,
-  anchor: number = range.first
-): Effect.Effect<RegionTrack, KymoError> =>
+/** `box` text parsed against the source's frame size. */
+export const boxOn = (source: Source, box: string): Effect.Effect<Box, KymoError> =>
   Effect.gen(function* () {
     const { timeline } = source
     if (timeline.size === null)
@@ -29,7 +32,22 @@ export const measureBox = (
           hint: "Drop box and use the source's own tracks."
         })
       )
-    return yield* trackRegion(source, range, yield* Effect.fromResult(parseBox(box, timeline.size)), {
-      anchor
-    })
+    return yield* Effect.fromResult(parseBox(box, timeline.size))
   })
+
+/** Follow `box` (source pixels, as it is at `anchor`, default the range's first frame) through the range. */
+export const measureBox = (
+  source: Source,
+  range: FrameRange,
+  box: string,
+  anchor: number = range.first
+): Effect.Effect<RegionTrack, KymoError> =>
+  Effect.flatMap(boxOn(source, box), (b) => trackRegion(source, range, b, { anchor }))
+
+/** Visible change inside `box`, a fixed place on screen, through the range. */
+export const measureChange = (
+  source: Source,
+  range: FrameRange,
+  box: string
+): Effect.Effect<BoxChange, KymoError> =>
+  Effect.flatMap(boxOn(source, box), (b) => boxChange(source, range, b))

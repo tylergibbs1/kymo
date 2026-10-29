@@ -47,4 +47,17 @@ Images go to a fresh `kymo-*` temp directory per run, one subdirectory per handl
 
 Video has no numeric tracks of its own. `track --box x,y,w,h` follows a region by template matching from the first frame of the range, so the box must be where the subject is at that frame (with `--range 2s..4s`, look at `2s`). Use `--anchor 3s` to read the box at another frame of the range, or a backwards range (`--range 4s..2s`) to track from the end: box a fading or entering element where it is fully visible and follow it back to where it appears. Matching ignores brightness and contrast, follows the part still inside the frame when the subject runs off an edge (positions past the edge are reported), and measures scale, so `w` and `h` change when the subject grows. It drifts on objects that rotate. `lost` lists the frames where it lost the region and why: `edge` (mostly past the frame edge), `faded` (faded out or hidden) or `low-confidence`. Use `--fit-easing` for an easing estimate and check the residual before trusting it. A fit's `start` and `end` say whether each end was seen at rest or estimated (`appeared`, `disappeared`); `easingSkipped` explains a track with no fit (`no-motion`, `too-few-samples`, `partial`, `lost`).
 
-`check --box` measures the same way and feeds the result to `safe-area` (`--safe-margin 0.05` action-safe by default, `0.1` title-safe) and to assertions on `box.x`, `box.y`, `box.w` and `box.h`.
+Positions resolve about 0.3 px on clean footage. While nothing in the box changes beyond the noise, the position holds exactly, so a box at rest does not jitter; on heavily compressed footage (crf 35 and up) it can still wander by about 0.1 px. `--props opacity` adds how much of its contrast at the anchor frame the subject shows (1 at the anchor, 0 when gone), measured where it is or where it was last seen as it faded: use it for fades, which `x`/`y` cannot see.
+
+`--props change` measures the box as a fixed place on screen instead: per frame, the fraction of its pixels that visibly changed since the previous frame (`box.change`, 0..1), plus `change.starts`, `change.settles`, the runs of frames that changed and the noise `floor` used. It reads the box at most at half the source resolution (and with its long edge at most 128 px), counts a pixel only when it changed by more than the clip's own noise (at least 5 luma steps) and, on an edge, by more than half a pixel of movement would make it change, and takes out a dim or brighten of the whole page around the box. It works on any range, and does not need the subject at the anchor frame.
+
+```sh
+kymo frames clip1 --at -1f --view grid                          # the element's box at rest
+kymo track clip1 --box 916,80,340,64 --props change              # starts, settles, changing runs
+kymo track clip1 --box 916,80,340,64 --range -1f..0f --props x y opacity --format detailed
+kymo frames clip1 --range 30f..40f --view diff --box 916,80,340,64   # changedFraction per frame
+```
+
+`frames --view diff` draws each frame N as its change from N−1 on a fixed scale: black under the noise floor named in the sheet label, white a full-scale change. Its `diff` field has each frame's `changedFraction` and `changedMean`, over the whole frame or inside `--box`. Because N is compared with N−1, the frame where a motion ends is the last frame with change.
+
+`check --box` measures the same way and feeds the result to `safe-area` (`--safe-margin 0.05` action-safe by default, `0.1` title-safe) and to assertions on `box.x`, `box.y`, `box.w`, `box.h`, `box.opacity` and `box.change` (e.g. `--assert "box.change == 0 after 40f"`).

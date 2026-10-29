@@ -23,6 +23,11 @@ export interface FakeOptions {
   readonly frames?: number
   /** Square's top-left x at frame i. Default moves 2 px per frame, wrapping. */
   readonly squareX?: (i: number) => number
+  /**
+   * Encoder-like noise: every pixel brightened by up to this many levels, in a pattern that changes
+   * every frame, as H.264 re-encodes a still picture. Default 0.
+   */
+  readonly noise?: number
 }
 
 /** Draws frame i at full size: a flat background with a white square. */
@@ -31,6 +36,17 @@ const draw = (width: number, height: number, x: number, y: number): RgbImage => 
   for (let row = y; row < Math.min(height, y + SQUARE); row++)
     for (let col = x; col < Math.min(width, x + SQUARE); col++)
       image.data.set(SQUARE_RGB, (row * width + col) * 3)
+  return image
+}
+
+/** Brighten each pixel by up to `amplitude` levels, in a pattern that differs from frame to frame. */
+const speckle = (image: RgbImage, frame: number, amplitude: number): RgbImage => {
+  if (amplitude === 0) return image
+  const d = image.data
+  for (let p = 0; p < d.length; p += 3) {
+    const n = ((p / 3) * 7 + frame * 13) % (amplitude + 1)
+    for (let c = 0; c < 3; c++) d[p + c] = Math.min(255, d[p + c]! + n)
+  }
   return image
 }
 
@@ -97,7 +113,10 @@ export const fakeSource = (o: FakeOptions = {}): Source & { readonly reads: Arra
         indices.map((index): DecodedFrame => ({
           index,
           t: secondsAt(r, index),
-          image: shrink(draw(width, height, squareX(index), squareY), options?.maxEdge)
+          image: shrink(
+            speckle(draw(width, height, squareX(index), squareY), index, o.noise ?? 0),
+            options?.maxEdge
+          )
         }))
       )
     },

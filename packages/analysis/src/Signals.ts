@@ -24,7 +24,7 @@ export interface Signals {
 /** Below this many luma steps a change is rounding or dither, whatever the clip. */
 const MIN_NOISE_LEVEL = 2
 /** This many changed pixels is movement: a short edge, not one stray pixel. */
-const MIN_MOVING_PIXELS = 3
+export const MIN_MOVING_PIXELS = 3
 /** Noise is what the quietest pairs show: this share of pixels in them changes by no more than it. */
 const NOISE_QUANTILE = 0.99
 const QUIET_SHARE = 0.1
@@ -141,6 +141,16 @@ const repeats = (
   return { repeat, noise }
 }
 
+/**
+ * The luma step a pixel must change by to count as changed, from a clip's pairs of frames (or of
+ * one region of them): what the quietest pairs show, so a still shot's grain or encoder noise, or
+ * the slowest motion in the clip. Never below `MIN_NOISE_LEVEL`.
+ */
+export const noiseLevelOf = (pairs: ReadonlyArray<DiffLevels>): number => {
+  const levels = pairs.map((l) => levelQuantile(l, NOISE_QUANTILE)).sort((a, b) => a - b)
+  return Math.max(MIN_NOISE_LEVEL, levels[Math.floor(QUIET_SHARE * (levels.length - 1))] ?? 0)
+}
+
 /** Longest repeat, in seconds, that counts as a held or stalled frame; anything longer is a pause. */
 export const MAX_HELD_SECONDS = 0.25
 
@@ -155,12 +165,7 @@ export const signals = (scan: Scan): Signals => {
     f.map((s) => s.motion),
     maxHeldFrames(scan)
   )
-  // The quietest pairs that are not repeats: a still shot's grain, or the slowest motion in the clip.
-  const levels = f.flatMap((s, k) =>
-    s.levels === null || repeat[k] ? [] : [levelQuantile(s.levels, NOISE_QUANTILE)]
-  )
-  levels.sort((a, b) => a - b)
-  const noiseLevel = Math.max(MIN_NOISE_LEVEL, levels[Math.floor(QUIET_SHARE * (levels.length - 1))] ?? 0)
+  const noiseLevel = noiseLevelOf(f.flatMap((s, k) => (s.levels === null || repeat[k] ? [] : [s.levels])))
   const changed = f.map((s) => (s.levels === null ? null : levelsAbove(s.levels, noiseLevel)))
   const moving = f.map(
     (s, k) => s.levels !== null && changed[k]! * total(s.levels) >= MIN_MOVING_PIXELS && !repeat[k]

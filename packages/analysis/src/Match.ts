@@ -31,6 +31,12 @@ export interface Score {
   readonly visible: number
   /** Standard deviation of the frame under the template over the template's: ~opacity of a fade. */
   readonly contrast: number
+  /**
+   * How much of the template's own contrast the frame shows, along the template's pattern: the slope
+   * of frame on template. A subject faded to opacity `a` over a plain background shows `a`; unlike
+   * `contrast`, background detail that does not line up with the subject adds nothing.
+   */
+  readonly gain: number
 }
 
 /** Template pixels varying less than this (grey levels², per pixel) carry no structure to correlate. */
@@ -92,7 +98,7 @@ export const score = (plane: Plane, t: Template, pose: Pose): Score => {
   const [j0, j1] = visibleSpan(t.oy, cy, s, H)
   const cols = i1 - i0 + 1
   const rows = j1 - j0 + 1
-  if (cols <= 0 || rows <= 0 || W < 2 || H < 2) return { q: 0, visible: 0, contrast: 0 }
+  if (cols <= 0 || rows <= 0 || W < 2 || H < 2) return { q: 0, visible: 0, contrast: 0, gain: 0 }
   const visible = (cols * rows) / (t.w * t.h)
   const xs = new Int32Array(cols)
   const fx = new Float32Array(cols)
@@ -135,11 +141,13 @@ export const score = (plane: Plane, t: Template, pose: Pose): Score => {
   const n = cols * rows
   const vt = stt / n - (st / n) ** 2
   const vp = spp / n - (sp / n) ** 2
-  if (vt < FLAT) return { q: 0, visible, contrast: 0 }
+  if (vt < FLAT) return { q: 0, visible, contrast: 0, gain: 0 }
   const contrast = Math.sqrt(Math.max(0, vp) / vt)
-  if (vp < 1e-6) return { q: 0, visible, contrast }
-  const q = (stp / n - (st / n) * (sp / n)) / Math.sqrt(vt * vp)
-  return { q: Math.max(0, Math.min(1, q)), visible, contrast }
+  const covariance = stp / n - (st / n) * (sp / n)
+  const gain = covariance / vt
+  if (vp < 1e-6) return { q: 0, visible, contrast, gain }
+  const q = covariance / Math.sqrt(vt * vp)
+  return { q: Math.max(0, Math.min(1, q)), visible, contrast, gain }
 }
 
 export interface SearchWindow {

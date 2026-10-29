@@ -9,10 +9,12 @@ import {
   frameIndex
 } from "@kymo/core"
 import { Effect, Result, Schema, Stream } from "effect"
+import { cutPatch } from "./Change.ts"
 import { type Pose, type Template, cutTemplate, score, search } from "./Match.ts"
 import { type Plane, planeOf, pyramid } from "./Plane.ts"
 import type { FrameRange } from "./Range.ts"
 import { round } from "./Stats.ts"
+import { VISIBLE_STEP, anyMovement, visibleChange } from "./Visible.ts"
 
 const Positive = Schema.Finite.check(Schema.isGreaterThan(0))
 
@@ -74,6 +76,12 @@ export const RegionTrack = Schema.Struct({
   h: Track,
   /** Match quality per frame, 0..1. Position samples are null where the region was lost. */
   confidence: Track,
+  /**
+   * `<name>.opacity`: how much of its contrast at the anchor frame the subject shows (1 at the
+   * anchor), measured where it is, or where it was last seen when it faded out. Null where it was
+   * lost past the frame edge or to something unlike it.
+   */
+  opacity: Track,
   /** Where position samples are null, and why; in frame order. */
   lost: Schema.Array(LostSpan)
 })
@@ -127,6 +135,8 @@ interface Model {
 
 interface State {
   pose: Pose
+  /** The frame `pose` was measured on: a frame that does not visibly differ from it keeps the pose. */
+  held: Plane | undefined
   vx: number
   vy: number
   /** Frames since the last match; 0 while matched. */
@@ -136,8 +146,34 @@ interface State {
 }
 
 type Step =
-  | { readonly _tag: "found"; readonly pose: Pose; readonly q: number }
-  | { readonly _tag: "lost"; readonly q: number; readonly reason: LostReason }
+  | { readonly _tag: "found"; readonly pose: Pose; readonly q: number; readonly gain: number }
+  | {
+      readonly _tag: "lost"
+      readonly q: number
+      readonly reason: LostReason
+      /** The subject's contrast where it was last seen, when it faded there; else unknown. */
+      readonly gain: number | null
+    }
+
+/** The subject's box at `pose`, in level-0 pixels. */
+const rectAt = (model: Model, box: Box, pose: Pose) => {
+  const w = pose.s * box.w * model.sx
+  const h = pose.s * box.h * model.sy
+  return { x: pose.cx - w / 2, y: pose.cy - h / 2, w, h }
+}
+
+/**
+ * Whether the subject's box looks the same as on the frame its pose was measured on. Then it has
+ * not moved, and measuring again would only turn encoder noise into sub-pixel jitter.
+ */
+const unchanged = (model: Model, box: Box, held: Plane, plane: Plane, pose: Pose): boolean => {
+  const rect = rectAt(model, box, pose)
+  const before = cutPatch(held, rect)
+  const now = cutPatch(plane, rect)
+  // Any change beyond noise is evidence of movement here, however small: the tracker resolves it.
+  const rule = { floor: VISIBLE_STEP, edge: 0 }
+  return !anyMovement(visibleChange(before.patch, now.patch, now.inner, rule))
+}
 
 const step = (model: Model, state: State, levels: ReadonlyArray<Plane>): Step => {
   const { pose, vx, vy, missed } = state
@@ -175,13 +211,21 @@ const step = (model: Model, state: State, levels: ReadonlyArray<Plane>): Step =>
     state.vx = (next.cx - pose.cx) / ahead
     state.vy = (next.cy - pose.cy) / ahead
     state.pose = next
+    state.held = levels[0]
     state.missed = 0
     state.reason = undefined
-    return { _tag: "found", pose: next, q: found.score.q }
+    const at = s === found.pose.s ? found.score : score(levels[0]!, model.templates[0]!, next)
+    return { _tag: "found", pose: next, q: found.score.q, gain: at.gain }
   }
   state.missed = missed + 1
+  state.held = undefined
   state.reason ??= lostReason(model, levels[0]!, pose, { cx: px, cy: py, s: pose.s })
-  return { _tag: "lost", q: found?.score.q ?? 0, reason: state.reason }
+  return {
+    _tag: "lost",
+    q: found?.score.q ?? 0,
+    reason: state.reason,
+    gain: state.reason === "faded" ? score(levels[0]!, model.templates[0]!, pose).gain : null
+  }
 }
 
 /**
@@ -296,38 +340,53 @@ export const trackRegion = (
     const ws = nulls()
     const hs = nulls()
     const qs = nulls()
+    const os = nulls()
     const reasons: Array<LostReason | undefined> = Array.from({ length: range.frameCount }, () => undefined)
 
     const [first] = yield* read([frameIndex(anchor)])
     const { model, start } = modelOf(planeOf(first!.image), box, size)
-    const record = (index: number, pose: Pose, q: number) => {
+    const record = (index: number, pose: Pose, q: number, gain: number) => {
       xs[index] = round(pose.cx / model.sx - (pose.s * box.w) / 2, 2)
       ys[index] = round(pose.cy / model.sy - (pose.s * box.h) / 2, 2)
       ws[index] = round(pose.s * box.w, 2)
       hs[index] = round(pose.s * box.h, 2)
       qs[index] = round(q, 3)
+      os[index] = round(Math.max(0, gain), 2)
     }
     xs[anchor] = round(box.x, 2)
     ys[anchor] = round(box.y, 2)
     ws[anchor] = round(box.w, 2)
     hs[anchor] = round(box.h, 2)
     qs[anchor] = 1
+    os[anchor] = 1
 
     const follow = (state: State, index: number, base: Plane) => {
+      if (state.held !== undefined && unchanged(model, box, state.held, base, state.pose)) {
+        // Still: the pose stands (if the subject is still recognisably there), and its speed is spent.
+        const at = score(base, model.templates[0]!, state.pose)
+        if (at.q >= LOST) {
+          state.vx = 0
+          state.vy = 0
+          record(index, state.pose, at.q, at.gain)
+          return
+        }
+      }
       const r = step(model, state, pyramid(base, model.levels))
-      if (r._tag === "found") record(index, r.pose, r.q)
+      if (r._tag === "found") record(index, r.pose, r.q, r.gain)
       else {
         qs[index] = round(r.q, 3)
+        os[index] = r.gain === null ? null : round(Math.max(0, r.gain), 2)
         reasons[index] = r.reason
       }
     }
 
-    const forward: State = { pose: start, vx: 0, vy: 0, missed: 0, reason: undefined }
+    const anchorPlane = planeOf(first!.image)
+    const forward: State = { pose: start, held: anchorPlane, vx: 0, vy: 0, missed: 0, reason: undefined }
     yield* Stream.runForEach(source.readFrames(span(anchor + 1, range.last), { maxEdge }), (frame) =>
       Effect.sync(() => follow(forward, frame.index, planeOf(frame.image)))
     )
     // Backwards: decode a chunk in order (video decodes forwards), then follow it in reverse.
-    const backward: State = { pose: start, vx: 0, vy: 0, missed: 0, reason: undefined }
+    const backward: State = { pose: start, held: anchorPlane, vx: 0, vy: 0, missed: 0, reason: undefined }
     for (let end = anchor - 1; end >= range.first; end -= BACKWARD_CHUNK) {
       const frames = yield* read(span(Math.max(range.first, end - BACKWARD_CHUNK + 1), end))
       const planes = frames.map((f) => ({ index: f.index, plane: planeOf(f.image) }))
@@ -345,6 +404,7 @@ export const trackRegion = (
       w: { name: `${name}.w`, unit: "px", samples: ws },
       h: { name: `${name}.h`, unit: "px", samples: hs },
       confidence: { name: `${name}.confidence`, unit: "0..1", samples: qs },
+      opacity: { name: `${name}.opacity`, unit: "ratio", samples: os },
       lost: lostSpans(range, reasons)
     }
   })

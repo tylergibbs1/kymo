@@ -96,7 +96,7 @@ export const ScanOutput = Schema.Struct({
     energy: Schema.optionalKey(
       Schema.Array(Schema.NullOr(Schema.Number)).annotate({
         description:
-          "Detailed only: raw energy per frame of the range, first frame first, cut frames included; null where unknown."
+          'Detailed only: whole-frame motion energy per frame of the range, first frame first: the mean absolute luma change from the previous frame over the whole frame read at 96 px, 0..1; cut frames included, null where there is no frame before. A small element barely moves it and every other motion on the page adds to it: to time something in one region, use track with box and props ["change"].'
       })
     )
   }).annotate({ description: "Motion-energy summary." }),

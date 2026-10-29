@@ -1,7 +1,8 @@
-import { parseBox } from "@kymo/analysis"
+import { type Box, type FrameChange, VISIBLE_STEP, pairChanges, parseBox } from "@kymo/analysis"
+import { boxOn } from "../Region.ts"
 import {
   Address,
-  type FrameIndex,
+  FrameIndex,
   FramesView,
   InvalidInput,
   type KymoError,
@@ -42,12 +43,15 @@ const fields = {
   source: SourceField,
   view: FramesView.annotate({
     description:
-      "sheet (default): the frames side by side, labelled. onion: 3–16 frames blended into one image to show path and spacing. diff: what changed since each frame's previous frame (black = nothing). follow: crop `box` from every frame. grid: a sheet with source-pixel coordinates drawn on, for orientation only."
+      "sheet (default): the frames side by side, labelled. onion: 3–16 frames blended into one image to show path and spacing. diff: what changed since each frame's previous frame, on a fixed scale (black = no change beyond the clip's noise), with each frame's changed fraction in diff. follow: crop `box` from every frame. grid: a sheet with source-pixel coordinates drawn on, for orientation only."
   }).pipe(Schema.withDecodingDefaultKey(Effect.succeed("sheet" as const))),
   target: TargetInput,
   format: Format,
   box: Schema.optionalKey(
-    BoxText.annotate({ description: "For view=follow: the region x,y,w,h in source pixels." })
+    BoxText.annotate({
+      description:
+        "For view=follow: the region to crop. For view=diff: the region the numbers in diff are measured in (default the whole frame). x,y,w,h in source pixels."
+    })
   ),
   uncapped: Uncapped.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
   separate: Schema.Boolean.annotate({
@@ -74,6 +78,32 @@ export const FrameValues = Schema.Struct({
   })
 })
 
+export const DiffFrame = Schema.Struct({
+  address: Schema.String.annotate({ description: "Frame N, compared with N-1." }),
+  index: FrameIndex,
+  changedFraction: Schema.Number.annotate({
+    description:
+      "Fraction of the pixels (inside box, or of the whole frame) that changed from N-1 beyond floor, 0..1. 0 means nothing visibly changed."
+  }),
+  changedMean: Schema.Number.annotate({
+    description: "Mean luma change of those pixels, 0..1; 0 when none changed."
+  })
+})
+
+export const DiffNumbers = Schema.Struct({
+  box: Schema.NullOr(Schema.String).annotate({
+    description: "The region measured, x,y,w,h in source pixels; null for the whole frame."
+  }),
+  floor: Schema.Number.annotate({
+    description:
+      "Luma steps (0..255) a pixel had to change by to count, and below which the heatmap is black: 5 (2% of full scale), or these frames' own noise when that is larger."
+  }),
+  frames: Schema.Array(DiffFrame).annotate({
+    description:
+      "One per diffed frame, in order. A diff at N compares N with N-1, so the frame where something reaches its final state is the last one with a non-zero changedFraction."
+  })
+})
+
 export const FramesOutput = Schema.Struct({
   handle: Schema.String,
   view: FramesView,
@@ -85,6 +115,11 @@ export const FramesOutput = Schema.Struct({
   samples: Schema.optionalKey(
     Schema.Array(FrameValues).annotate({
       description: "Detailed only: the source's numeric tracks at each requested frame."
+    })
+  ),
+  diff: Schema.optionalKey(
+    DiffNumbers.annotate({
+      description: "view=diff only: how much each frame changed, measured, not eyeballed."
     })
   ),
   next: Schema.NullOr(Cursor),
@@ -99,6 +134,8 @@ interface Draw {
   readonly target: Target
   readonly view: FramesView
   readonly box: FollowBox | undefined
+  /** view=diff: levels of change drawn black (the noise floor the numbers use too). */
+  readonly floor: number
   readonly labelStyle: Address.LabelStyle
 }
 
@@ -118,7 +155,7 @@ const drawView = (d: Draw, frames: ReadonlyArray<FrameIndex>, cursor: CursorType
     case "grid":
       return sheet({ ...common, pixelGrid: true })
     case "diff":
-      return diff(common)
+      return diff({ ...common, floor: d.floor })
     case "onion":
       return Effect.map(
         onion({ source: d.source, frames, outDir: d.outDir, target: d.target, labelStyle: d.labelStyle }),
@@ -167,8 +204,20 @@ const followBox = (source: Source, text: string): Effect.Effect<FollowBox, KymoE
   })
 }
 
-const viewLabel = (input: FramesInput): string | undefined =>
-  input.view === "sheet" ? undefined : input.view === "follow" ? `follow ${input.box}` : input.view
+const viewLabel = (input: FramesInput, floor: number): string | undefined =>
+  input.view === "sheet"
+    ? undefined
+    : input.view === "follow"
+      ? `follow ${input.box}`
+      : input.view === "diff"
+        ? `diff of each frame with the one before, black under ${floor} luma steps, white a full-scale change`
+        : input.view
+
+/** The whole frame as a box, for diff numbers without one. */
+const wholeFrame = (source: Source): Box | undefined =>
+  source.timeline.size === null
+    ? undefined
+    : { x: 0, y: 0, w: source.timeline.size.width, h: source.timeline.size.height }
 
 export const frames = define({
   name: "frames",
@@ -198,10 +247,10 @@ export const frames = define({
         "view=follow needs a box to follow.",
         "Pass box=x,y,w,h in source pixels, e.g. box=120,80,64,64."
       )
-    if (input.view !== "follow" && input.box !== undefined)
+    if (input.view !== "follow" && input.view !== "diff" && input.box !== undefined)
       return yield* invalid(
-        `box is only used by view=follow, not view=${input.view}.`,
-        "Pass view=follow, or drop box."
+        `box is only used by view=follow and view=diff, not view=${input.view}.`,
+        "Pass view=follow or view=diff, or drop box."
       )
     if (input.separate && input.view === "onion")
       return yield* invalid(
@@ -224,12 +273,29 @@ export const frames = define({
     // A diff shows each frame against the one before; the first frame has none, so it is skipped.
     const skipFirst = input.view === "diff" && indices[0] === 0 && indices.length > 1
     const drawn = skipFirst ? indices.slice(1) : indices
+    const measuredIn =
+      input.view !== "diff"
+        ? undefined
+        : input.box === undefined
+          ? wholeFrame(source)
+          : yield* boxOn(source, input.box)
+    const changes =
+      measuredIn === undefined
+        ? undefined
+        : yield* pairChanges(
+            source,
+            drawn.filter((i) => i > 0),
+            measuredIn
+          )
+    const floor = changes?.floor ?? VISIBLE_STEP
     const draw: Draw = {
       source,
       outDir: yield* output.dirFor(timeline.handle),
       target: input.target,
       view: input.view,
-      box: input.box === undefined ? undefined : yield* followBox(source, input.box),
+      box:
+        input.view === "follow" && input.box !== undefined ? yield* followBox(source, input.box) : undefined,
+      floor,
       labelStyle: style
     }
     const result = input.separate
@@ -242,7 +308,7 @@ export const frames = define({
       return detailed ? { address, index, t: secondsAt(timeline.rate, index) } : { address, index }
     })
     const shown = result.images.reduce((n, image) => n + image.frames.length, 0)
-    const viewLabelText = viewLabel(input)
+    const viewLabelText = viewLabel(input, floor)
     const sheets = input.separate
       ? result.images.map((image, k) =>
           sheetOf(
@@ -296,6 +362,20 @@ export const frames = define({
               : {})
           }
         : {}),
+      ...(changes === undefined
+        ? {}
+        : {
+            diff: {
+              box: input.box ?? null,
+              floor,
+              frames: changes.frames.map((c: FrameChange) => ({
+                address: Address.format(timeline.rate, c.index),
+                index: c.index,
+                changedFraction: c.changedFraction,
+                changedMean: c.changedMean
+              }))
+            }
+          }),
       next: result.next,
       ...(notes.length > 0 ? { note: notes.join(" ") } : {})
     }

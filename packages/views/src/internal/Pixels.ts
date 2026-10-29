@@ -40,18 +40,24 @@ const COLORMAP: Uint8Array = (() => {
   return lut
 })()
 
-/** Per-pixel largest channel difference, mapped through the colormap. Images must be the same size. */
-export const heatmap = (a: RgbImage, b: RgbImage): RgbImage => {
+/**
+ * Per-pixel largest channel difference, mapped through the colormap on a fixed scale: black up to
+ * `floor` levels (noise, never drawn as change), the brightest colour at a full-scale change.
+ * Images must be the same size.
+ */
+export const heatmap = (a: RgbImage, b: RgbImage, floor: number): RgbImage => {
   const out = new Uint8Array(a.data.length)
+  const span = Math.max(1, 255 - floor)
   for (let p = 0; p < a.data.length; p += 3) {
     const d = Math.max(
       Math.abs(a.data[p]! - b.data[p]!),
       Math.abs(a.data[p + 1]! - b.data[p + 1]!),
       Math.abs(a.data[p + 2]! - b.data[p + 2]!)
     )
-    out[p] = COLORMAP[d * 3]!
-    out[p + 1] = COLORMAP[d * 3 + 1]!
-    out[p + 2] = COLORMAP[d * 3 + 2]!
+    const v = d <= floor ? 0 : Math.max(1, Math.round((255 * (d - floor)) / span))
+    out[p] = COLORMAP[v * 3]!
+    out[p + 1] = COLORMAP[v * 3 + 1]!
+    out[p + 2] = COLORMAP[v * 3 + 2]!
   }
   return RgbImage.make(a.width, a.height, out)
 }

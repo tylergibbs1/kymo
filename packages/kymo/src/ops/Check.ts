@@ -18,7 +18,7 @@ import { Effect, Schema } from "effect"
 import { BoxText, Range, Source as SourceField } from "../Fields.ts"
 import { analysisRange } from "../Frames.ts"
 import { define, jsonLines } from "../Operation.ts"
-import { exampleBox, findBoxHint, measureBox } from "../Region.ts"
+import { exampleBox, findBoxHint, measureBox, measureChange } from "../Region.ts"
 
 export const CheckInput = Schema.Struct({
   source: SourceField,
@@ -33,14 +33,14 @@ export const CheckInput = Schema.Struct({
       .check(Schema.isMinLength(1))
       .annotate({
         description:
-          'Assertions over tracks and markers, e.g. "box.x <= 600 at 1s", "box.opacity >= 0.99 by 500ms", "motion < 0.01 after @impact3", "@impact1 within #15..#25". Tracks: the source\'s own, motion, and box.x/.y/.w/.h when box is given; markers: the source\'s plus cut1.., peak1...'
+          'Assertions over tracks and markers, e.g. "box.x <= 600 at 1s", "box.opacity >= 0.99 by 500ms", "box.change == 0 after 40f", "@impact1 within #15..#25". Tracks: the source\'s own; with box, box.x/.y/.w/.h/.opacity (the tracked subject) and box.change (the fraction of the box, fixed on screen, that visibly changed since the previous frame); and motion (whole-frame energy). Markers: the source\'s plus cut1.., peak1...'
       })
   ),
   range: Schema.optionalKey(Range),
   box: Schema.optionalKey(
     BoxText.annotate({
       description:
-        "A region to measure on footage, as it is at the first frame of the range: x,y,w,h in source pixels, e.g. 120,80,64,64 (same as track's box). It is tracked through the range; safe-area checks it, and assertions can use box.x, box.y, box.w and box.h."
+        "A region to measure on footage, as it is at the first frame of the range: x,y,w,h in source pixels, e.g. 120,80,64,64 (same as track's box). It is tracked through the range; safe-area checks it, and assertions can use box.x, box.y, box.w, box.h and box.opacity, and box.change for the box where it is on screen."
     })
   ),
   safeMargin: Schema.optionalKey(
@@ -120,6 +120,11 @@ const groundTruthRegion = (source: Source, tracks: ReadonlyArray<Track>, range: 
       unit: "0..1",
       samples: x.samples.map((v) => (v === null ? null : 1))
     },
+    opacity: get("box.opacity") ?? {
+      name: "box.opacity",
+      unit: "ratio",
+      samples: x.samples.map(() => null)
+    },
     lost: []
   }
   return [region]
@@ -129,7 +134,7 @@ export const check = define({
   name: "check",
   title: "Check rules and assertions",
   description:
-    'Find problems and prove fixes with numbers: lint rules (duplicate or dropped frames, flicker, black frames, safe area, non-monotonic curves) and assertions such as "box.x <= 600 at 1s" or "@impact1 within #15..#25". Each finding names its frames and carries a ready-made kymo_frames call to look at it. On footage, pass box (the region at the first frame of the range) to check safe-area and assert on box.x/.y/.w/.h. Use it after a change to show the change worked; use frames to see a finding.',
+    'Find problems and prove fixes with numbers: lint rules (duplicate or dropped frames, flicker, black frames, safe area, non-monotonic curves) and assertions such as "box.x <= 600 at 1s" or "@impact1 within #15..#25". Each finding names its frames and carries a ready-made kymo_frames call to look at it. On footage, pass box (the region at the first frame of the range) to check safe-area and assert on box.x/.y/.w/.h/.opacity, or box.change for the region where it is on screen. Use it after a change to show the change worked; use frames to see a finding, and track to read values.',
   cost: "no images",
   examples: [
     { source: "synthetic:flicker?at=40" },
@@ -175,9 +180,13 @@ export const check = define({
     })
     const derived: { tracks: Array<Track>; markers: Array<Marker> } = {
       tracks:
-        measured === undefined ? [] : [measured.x, measured.y, measured.w, measured.h, measured.confidence],
+        measured === undefined
+          ? []
+          : [measured.x, measured.y, measured.w, measured.h, measured.confidence, measured.opacity],
       markers: []
     }
+    if (input.box !== undefined && input.assert?.some((a) => a.includes("box.change")))
+      derived.tracks.push((yield* measureChange(source, range, input.box)).track)
     if (input.assert !== undefined && timeline.size !== null) {
       const stats = yield* scan(source, range)
       const cuts = detectCuts(stats)

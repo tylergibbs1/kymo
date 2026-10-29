@@ -116,6 +116,32 @@ describe("tracking a subject that scales", () => {
   )
 })
 
+describe("tracking a subject at rest", () => {
+  // A textured square that moves right 2px a frame for 6 frames, then rests, under encoder-like
+  // noise that changes every frame (as B and P frames re-code a still picture differently).
+  const x = (i: number) => 12 + 2 * Math.min(i, 6)
+  const resting = fakeSource({
+    frames: 30,
+    scene: (i) => ({
+      background: [238, 241, 245],
+      rects: texturedSquare(x(i) + 0.3, 17.6, 15),
+      grain: { amplitude: 2, seed: i % 3 }
+    })
+  })
+
+  it.effect("holds its position exactly once nothing in the box changes beyond noise", () =>
+    Effect.gen(function* () {
+      const range = yield* FrameRange.whole(resting.timeline)
+      const region = yield* trackRegion(resting, range, { x: x(0), y: 17, w: 16, h: 16 })
+      for (const t of [region.x, region.y, region.w, region.h]) {
+        const rest = t.samples.slice(8) as Array<number>
+        expect(Math.max(...rest) - Math.min(...rest), t.name).toBe(0)
+      }
+      expect(Math.abs(region.x.samples[29]! - x(29) - 0.3)).toBeLessThanOrEqual(0.5)
+    })
+  )
+})
+
 describe("tracking cost", () => {
   it.effect("decodes a large box small, so cost does not grow with it", () =>
     Effect.gen(function* () {
