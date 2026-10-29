@@ -206,7 +206,7 @@ describe("kymo CLI", () => {
     const refused = await kymo("check", drift, "--rules", "safe-area")
     expect(refused.code).toBe(2)
     const why = JSON.parse(refused.stderr) as Record<string, string>
-    expect(why["hint"]).toMatch(/kymo check \S+ --rules safe-area --box \d+,\d+,\d+,\d+/)
+    expect(why["hint"]).toMatch(/\(CLI: --box \d+,\d+,\d+,\d+\)/)
 
     const noTrack = await kymo("check", drift, "--assert", "box.x <= 170 at 1s")
     expect(noTrack.code).toBe(2)

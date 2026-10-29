@@ -1,5 +1,13 @@
 /** Running operations the way every shell does, in a fresh workspace, plus media fixtures made with ffmpeg. */
-import { type AnyOperation, type Operation, execute, kymoLayer } from "kymo"
+import {
+  type AnyOperation,
+  type Operation,
+  execute,
+  flatInputSchema,
+  kebab,
+  kymoLayer,
+  operations
+} from "kymo"
 import { Effect, Layer, Schema } from "effect"
 import { execFileSync } from "node:child_process"
 import { mkdtempSync, rmSync } from "node:fs"
@@ -26,6 +34,34 @@ export const call = <I extends Codec, O extends Codec>(op: Operation<I, O>, inpu
   Effect.flatMap(execute(op, input), (json) => Schema.decodeUnknownEffect(op.output)(json))
 
 export const failure = (op: AnyOperation, input: unknown) => Effect.flip(execute(op, input))
+
+/**
+ * Options a hint names that its operation does not have. A hint names options as `field=value` or
+ * `--flag` (the operation's own), or inside a `kymo <op> …` command (that operation's), and each must
+ * be a field of that operation's input Schema or its CLI flag.
+ */
+export const missingOptions = (op: AnyOperation, hint: string): Array<string> => {
+  const known = (name: string) => {
+    const target = operations.find((o) => o.name === name)
+    const fields = target === undefined ? [] : Object.keys(flatInputSchema(target).properties)
+    return { fields, flags: [...fields.map(kebab), "json", "out"] }
+  }
+  const missing: Array<string> = []
+  const own = known(op.name)
+  const rest = hint.replace(/kymo (\w+)((?: (?!kymo )[^;()`,]*)*)/g, (_, name: string, args: string) => {
+    if (name === "schema") return ""
+    const theirs = known(name)
+    if (theirs.fields.length === 0) missing.push(`kymo ${name}`)
+    for (const [, flag] of args.matchAll(/--([a-z][a-z-]*)/g))
+      if (!theirs.flags.includes(flag!)) missing.push(`${name} --${flag}`)
+    return ""
+  })
+  for (const [, flag] of rest.matchAll(/--([a-z][a-z-]*)/g))
+    if (!own.flags.includes(flag!)) missing.push(`--${flag}`)
+  for (const [, field] of rest.matchAll(/(?<![\w.?&])([a-z][A-Za-z]*)=/g))
+    if (!own.fields.includes(field!)) missing.push(`${field}=`)
+  return missing
+}
 
 /** A temp directory for media made once per test file. Call `remove` in afterAll. */
 export const mediaDir = () => {

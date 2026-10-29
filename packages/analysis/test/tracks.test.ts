@@ -192,4 +192,18 @@ describe("non-monotonic", () => {
       expect(report.findings[0]!.message).toContain("#hero.opacity")
     })
   )
+
+  it.effect("finds a step back that is small beside a long travel, but not tracking jitter", () =>
+    Effect.gen(function* () {
+      const source = fakeSource({ frames: 100, scene: () => ({ background: [0, 0, 0] }), size: null })
+      const range = yield* FrameRange.whole(source.timeline)
+      // 9 px a frame from 220 to 1020, stepping back 8 px over frames 70-71 (1% of the travel).
+      const knob = (i: number) =>
+        i < 70 ? 220 + 9 * i : i < 72 ? 841 - 4 * (i - 69) : Math.min(1020, 843 + 10 * (i - 72))
+      const back = { ...trackOf("knob.x", 100, knob), unit: "px" }
+      const jitter = { ...trackOf("card.x", 100, (i) => 0.3 * i + (i % 2 === 0 ? 0.25 : -0.25)), unit: "px" }
+      const report = yield* check({ source, range, tracks: [back, jitter] })
+      expect(report.findings.map((f) => [f.message.split(" ")[0], f.index])).toEqual([["knob.x", 70]])
+    })
+  )
 })

@@ -2,7 +2,7 @@
  * CLI flags derived from an operation's input JSON Schema, so a field added to a Schema is a flag
  * with no CLI change. Field `maxEdge` is flag `--max-edge`; the source fields are positional.
  */
-import type { ObjectSchema } from "kymo"
+import { type ObjectSchema, kebab } from "kymo"
 import { Option } from "effect"
 import { Argument, Flag } from "effect/cli"
 
@@ -31,8 +31,6 @@ const POSITIONAL = ["source", "src", "a", "b"]
 
 /** The value of `--target` that selects the object form. */
 export const OBJECT_CHOICE = "custom"
-
-export const kebab = (key: string): string => key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)
 
 type Json = Readonly<Record<string, unknown>>
 

@@ -17,7 +17,7 @@ import { Workspace } from "@kymo/sources"
 import { Effect, Schema } from "effect"
 import { BoxText, Range, Source as SourceField } from "../Fields.ts"
 import { analysisRange } from "../Frames.ts"
-import { define, jsonLines } from "../Operation.ts"
+import { define, jsonLines, optionHint } from "../Operation.ts"
 import { exampleBox, findBoxHint, measureBox, measureChange } from "../Region.ts"
 
 export const CheckInput = Schema.Struct({
@@ -25,7 +25,7 @@ export const CheckInput = Schema.Struct({
   rules: Schema.optionalKey(
     Schema.Array(RuleName).check(Schema.isMinLength(1)).annotate({
       description:
-        "Lint rules to run. Default without assert: every pixel rule (duplicate-frames, dropped-frames, flicker, black-frames), plus safe-area when there is a box (the box field, or the source's box.* tracks). Default with assert: none, so the verdict is the assertions'. non-monotonic runs on request, over the source's tracks."
+        "Lint rules to run. Default without assert: every pixel rule (duplicate-frames, dropped-frames, flicker, black-frames), plus safe-area when there is a box (the box field, or the source's box.* tracks), plus non-monotonic when tracks is given. Default with assert: none, so the verdict is the assertions'. non-monotonic runs on request, over tracks."
     })
   ),
   assert: Schema.optionalKey(
@@ -37,6 +37,14 @@ export const CheckInput = Schema.Struct({
       })
   ),
   range: Schema.optionalKey(Range),
+  tracks: Schema.optionalKey(
+    Schema.Array(Schema.String.check(Schema.isMinLength(1)))
+      .check(Schema.isMinLength(1))
+      .annotate({
+        description:
+          "Tracks non-monotonic checks, each expected to move one way: the source's own (probe lists them) and, with box, box.x, box.y, box.w, box.h and box.opacity. Default: with box, box.x and box.y (an axis that does not move is skipped); without, the source's own tracks."
+      })
+  ),
   box: Schema.optionalKey(
     BoxText.annotate({
       description:
@@ -79,6 +87,52 @@ export const CheckOutput = Schema.Struct({
       'One line for people and agents, e.g. "Pass with 2 warnings, 0 errors, 0 info; 3 of 3 assertions passed."'
   })
 }).annotate({ identifier: "CheckOutput" })
+
+const invalid = (message: string, hint: string) => Effect.fail(new InvalidInput({ message, hint }))
+
+/**
+ * The tracks non-monotonic reads: those named in `tracks`, else a measured box's x and y (an axis
+ * that does not move has no motion to reverse in), else the source's own. A measured box's tracks
+ * replace the source's own tracks of the same name. None unless the rule runs.
+ */
+const monotonicTracks = (
+  input: typeof CheckInput.Type,
+  rules: ReadonlyArray<RuleName> | undefined,
+  own: ReadonlyArray<Track>,
+  measured: RegionTrack | undefined,
+  boxHint: string
+): Effect.Effect<ReadonlyArray<Track>, InvalidInput> => {
+  const runs = rules === undefined ? input.tracks !== undefined : rules.includes("non-monotonic")
+  if (!runs)
+    return input.tracks === undefined
+      ? Effect.succeed([])
+      : invalid(
+          "tracks is only read by the non-monotonic rule, which this check does not run.",
+          `Add the rule, e.g. ${optionHint(CheckInput, "rules", ["non-monotonic"])}, or drop tracks.`
+        )
+  const fromBox =
+    measured === undefined ? [] : [measured.x, measured.y, measured.w, measured.h, measured.opacity]
+  const available = [...own.filter((t) => !fromBox.some((b) => b.name === t.name)), ...fromBox]
+  const viaBox = `${boxHint}, and non-monotonic checks box.x and box.y`
+  if (input.tracks !== undefined) {
+    const unknown = input.tracks.filter((name) => !available.some((t) => t.name === name))
+    if (unknown.length > 0)
+      return invalid(
+        `No track named ${unknown.join(", ")}.`,
+        available.length === 0
+          ? `This source has no tracks. ${viaBox}.`
+          : `Name tracks from: ${available.map((t) => t.name).join(", ")}${measured === undefined ? "; box.x, box.y, box.w, box.h and box.opacity need box" : ""}.`
+      )
+    return Effect.succeed(input.tracks.map((name) => available.find((t) => t.name === name)!))
+  }
+  if (measured !== undefined) return Effect.succeed([measured.x, measured.y])
+  if (own.length === 0)
+    return invalid(
+      "non-monotonic needs something that should move one way, and this source has no tracks.",
+      `${viaBox}.`
+    )
+  return Effect.succeed(own)
+}
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 || word === "info" ? "" : "s"}`
 
@@ -161,12 +215,14 @@ export const check = define({
     const own = yield* Effect.forEach(timeline.tracks, (t) => source.track(t.name))
     const measured = input.box === undefined ? undefined : yield* measureBox(source, range, input.box)
     const regions = measured === undefined ? groundTruthRegion(source, own, range) : [measured]
+    const boxHint =
+      timeline.size === null
+        ? "Pass a source with pixels and its box"
+        : `Pass the box as it is at the first frame of the range, e.g. ${optionHint(CheckInput, "box", exampleBox(timeline.size))}; ${findBoxHint(source, range)}`
     if (input.rules?.includes("safe-area") && regions.length === 0 && timeline.size !== null)
-      return yield* Effect.fail(
-        new InvalidInput({
-          message: `safe-area needs the box of what must stay inside the frame, and ${timeline.handle} has no box.* tracks.`,
-          hint: `Pass the box as it is at the first frame of the range, e.g. kymo check ${timeline.handle} --rules safe-area --box ${exampleBox(timeline.size)} (MCP: box="${exampleBox(timeline.size)}"); ${findBoxHint(source, range)}.`
-        })
+      return yield* invalid(
+        `safe-area needs the box of what must stay inside the frame, and ${timeline.handle} has no box.* tracks.`,
+        `${boxHint}.`
       )
     // Assertions alone ask one question; running every default rule too would bury its answer.
     const rules = input.rules ?? (input.assert === undefined ? undefined : [])
@@ -175,7 +231,7 @@ export const check = define({
       range,
       ...(rules === undefined ? {} : { rules }),
       ...(input.safeMargin === undefined ? {} : { safeMargin: input.safeMargin }),
-      tracks: input.rules?.includes("non-monotonic") ? own : [],
+      tracks: yield* monotonicTracks(input, rules, own, measured, boxHint),
       regions
     })
     const derived: { tracks: Array<Track>; markers: Array<Marker> } = {

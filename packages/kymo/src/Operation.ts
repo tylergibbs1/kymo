@@ -87,6 +87,23 @@ export const define = <I extends Codec<unknown>, O extends Codec<unknown>>(
   op: Operation<I, O>
 ): Operation<I, O> => op
 
+/** The CLI flag of an input field: `maxEdge` is `--max-edge`. */
+export const kebab = (key: string): string => key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)
+
+/**
+ * An option as both shells spell it, for hints: `box=120,80,64,64 (CLI: --box 120,80,64,64)`, or for
+ * a list `tracks=["box.x","box.y"] (CLI: --tracks box.x box.y)`. The key is typed against the input's
+ * fields, so a hint cannot name an option the input does not have.
+ */
+export const optionHint = <F extends Schema.Struct.Fields>(
+  _input: Schema.Struct<F>,
+  key: keyof F & string,
+  value: string | ReadonlyArray<string>
+): string =>
+  typeof value === "string"
+    ? `${key}=${value} (CLI: --${kebab(key)} ${value})`
+    : `${key}=${JSON.stringify(value)} (CLI: --${kebab(key)} ${value.join(" ")})`
+
 /** Unknown keys are errors: a typo silently falling back to a default is the worst failure. */
 const parseOptions = { onExcessProperty: "error", errors: "all" } as const
 

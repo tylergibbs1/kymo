@@ -4,9 +4,14 @@ import type { FrameRange } from "./Range.ts"
 import { knownSamples, movingSegment } from "./Segment.ts"
 import { round } from "./Stats.ts"
 import type { RegionTrack } from "./Tracker.ts"
+import { unitScale } from "./Units.ts"
 
-/** A reversal smaller than this fraction of the segment's travel is noise. */
-const REVERSAL = 0.02
+/**
+ * A reversal is real when it steps back by more than this multiple of the unit's measurement noise
+ * (1 px for a position), however long the travel: a knob that slips back 8 px on an 800 px run has
+ * gone backwards. Exact units (ground truth) count any step back.
+ */
+const REVERSAL_NOISE = 2
 
 export const safeArea = (
   range: FrameRange,
@@ -70,7 +75,7 @@ export const nonMonotonic = (range: FrameRange, tracks: ReadonlyArray<Track>): A
     const v1 = inside[inside.length - 1]![1]
     const dir = Math.sign(v1 - v0)
     if (dir === 0) return []
-    const tol = REVERSAL * Math.abs(v1 - v0)
+    const tol = REVERSAL_NOISE * unitScale(track.unit).noise
     let extreme = v0
     let extremeAt = inside[0]![0]
     for (const [i, v] of inside) {
