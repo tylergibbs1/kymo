@@ -214,8 +214,29 @@ export const styledLabel = (rate: Rate, index: number, style: LabelStyle): strin
       ? `#${index}`
       : `${format(rate, index)} #${index}`
 
-/** The label form: timecode for reading, index for arithmetic. `08s10f #250`. */
-export const label = (rate: Rate, index: number): string => styledLabel(rate, index, "both")
+/**
+ * A frame as address text in a style: `#250` in index style, else `08s10f`. Shorter than a label, and
+ * valid to pass back in every style, so it fits hints and second mentions.
+ */
+export const styledAddress = (rate: Rate, index: number, style: LabelStyle): string =>
+  style === "index" ? `#${index}` : format(rate, index)
+
+/** A range of frames as address text: `01s..02s`, `01s..02s:3f`; `#30..#60` in index style. */
+const spanWith = (one: (index: number) => string, first: number, last: number, step?: number): string =>
+  `${one(first)}..${one(last)}${step === undefined ? "" : `:${step}f`}`
+
+/** The canonical range address, as JSON fields carry it: `01s..02s`, `01s..02s:3f`. */
+export const formatSpan = (rate: Rate, first: number, last: number, step?: number): string =>
+  spanWith((i) => format(rate, i), first, last, step)
+
+/** A range of frames as address text in a style: `01s..02s`, or `#30..#60` in index style. */
+export const styledSpan = (
+  rate: Rate,
+  first: number,
+  last: number,
+  style: LabelStyle,
+  step?: number
+): string => spanWith((i) => styledAddress(rate, i, style), first, last, step)
 
 /** A sheet or file span name: `0f-08s10f`. */
 export const spanName = (rate: Rate, first: number, last: number): string =>

@@ -1,4 +1,4 @@
-import { FrameRef, type Track } from "@kymo/core"
+import { Address, FrameRef, type Track } from "@kymo/core"
 import { Result, Schema } from "effect"
 import type { FrameRange } from "./Range.ts"
 import { round } from "./Stats.ts"
@@ -129,6 +129,8 @@ const gapOf = (reason: LostReason | undefined): Gap =>
   reason === "edge" || reason === "faded" ? "gone" : "unknown"
 
 export interface MotionOptions {
+  /** How reasons name frames. */
+  readonly labelStyle: Address.LabelStyle
   /** `auto` (default) finds where the value starts and stops changing; `exact` takes the whole range. */
   readonly segment?: "auto" | "exact"
   /** Why the track's null samples are null (a tracked region's `lost`); unexplained nulls are unknown. */
@@ -146,11 +148,13 @@ const fmt = (v: number) => String(round(v, 3))
 export const findMotion = (
   track: Track,
   range: FrameRange,
-  options: MotionOptions = {}
+  options: MotionOptions
 ): Result.Result<WholeMotion, Unfit> => {
   const name = track.name
   const unit = unitScale(track.unit)
-  const all = range.spanText(range.first, range.last)
+  const span = (a: number, b: number) => Address.styledSpan(range.rate, a, b, options.labelStyle)
+  const address = (i: number) => Address.styledAddress(range.rate, i, options.labelStyle)
+  const all = span(range.first, range.last)
   const reasons = new Map<number, LostReason>()
   for (const l of options.lost ?? [])
     for (let i = l.from.index; i <= l.to.index; i++) reasons.set(i, l.reason)
@@ -210,7 +214,7 @@ export const findMotion = (
     return { near: index + dir, far, gap: gapOf(reasons.get(index + dir)), reason: reasons.get(index + dir) }
   }
   const lostText = (a: number, b: number, reason: LostReason | undefined) =>
-    `${range.spanText(Math.min(a, b), Math.max(a, b))}${reason === undefined ? "" : ` (${reason})`}`
+    `${span(Math.min(a, b), Math.max(a, b))}${reason === undefined ? "" : ` (${reason})`}`
 
   if (options.segment === "exact") {
     const missing = range.indices().find((i) => track.samples[i] == null)
@@ -286,7 +290,7 @@ export const findMotion = (
     return Result.fail({
       track: name,
       status: "partial",
-      reason: `${name} has no value in ${lostText(g.near, g.far, g.reason)}, just before it is seen moving at ${range.ref(seg.from).address}: the start of the motion was not seen.`,
+      reason: `${name} has no value in ${lostText(g.near, g.far, g.reason)}, just before it is seen moving at ${address(seg.from)}: the start of the motion was not seen.`,
       from: range.ref(Math.min(g.near, g.far)),
       to: range.ref(Math.max(g.near, g.far))
     })
@@ -321,7 +325,7 @@ export const findMotion = (
     return Result.fail({
       track: name,
       status: "partial",
-      reason: `${name} was lost from ${range.ref(g.near).address} (${lostText(g.near, g.far, g.reason)}) while still moving: the end of the motion was not seen.`,
+      reason: `${name} was lost from ${address(g.near)} (${lostText(g.near, g.far, g.reason)}) while still moving: the end of the motion was not seen.`,
       from: range.ref(g.near),
       to: range.ref(g.far)
     })

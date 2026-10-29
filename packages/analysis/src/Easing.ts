@@ -1,4 +1,4 @@
-import { FrameRef, type Track, fpsOf } from "@kymo/core"
+import { Address, FrameRef, type Track, fpsOf } from "@kymo/core"
 import { Array as Arr, Result, Schema } from "effect"
 import { type Bezier, PRESETS, type Preset, bezierAt, minimize, springAt } from "./Curves.ts"
 import type { FrameRange } from "./Range.ts"
@@ -305,7 +305,11 @@ const UNDETERMINED = 3
  * Fit the CSS presets, a free cubic-bezier and a damped spring to a whole Motion. Fails as partial
  * when an unseen end is not pinned down by what was seen (a linear exit fits any later stop).
  */
-export const fitMotion = (motion: WholeMotion, range: FrameRange): Result.Result<EasingFit, Unfit> => {
+export const fitMotion = (
+  motion: WholeMotion,
+  range: FrameRange,
+  style: Address.LabelStyle
+): Result.Result<EasingFit, Unfit> => {
   const fps = fpsOf(range.rate)
   const minTravel = unitScale(motion.unit).minTravel
   const fit = fitter(motion, fps, minTravel)
@@ -429,7 +433,7 @@ export const fitMotion = (motion: WholeMotion, range: FrameRange): Result.Result
       return Result.fail({
         track: motion.track,
         status: "partial",
-        reason: `${motion.track} ${side === "start" ? "was already moving when it came into view" : "was still moving when it went out of view"} at ${range.ref(seen).address}, and what was seen fits ${side === "start" ? "a start" : "an end"} anywhere in ${range.spanText(lo, hi)}: the ${side} of the motion is not determined.`,
+        reason: `${motion.track} ${side === "start" ? "was already moving when it came into view" : "was still moving when it went out of view"} at ${Address.styledAddress(range.rate, seen, style)}, and what was seen fits ${side === "start" ? "a start" : "an end"} anywhere in ${Address.styledSpan(range.rate, lo, hi, style)}: the ${side} of the motion is not determined.`,
         from: range.ref(lo),
         to: range.ref(hi)
       })
@@ -462,6 +466,6 @@ export const fitMotion = (motion: WholeMotion, range: FrameRange): Result.Result
 export const fitEasing = (
   track: Track,
   range: FrameRange,
-  options: EasingOptions = {}
+  options: EasingOptions
 ): Result.Result<EasingFit, Unfit> =>
-  Result.flatMap(findMotion(track, range, options), (m) => fitMotion(m, range))
+  Result.flatMap(findMotion(track, range, options), (m) => fitMotion(m, range, options.labelStyle))

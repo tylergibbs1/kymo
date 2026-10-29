@@ -15,6 +15,7 @@ const REVERSAL_NOISE = 2
 
 export const safeArea = (
   range: FrameRange,
+  style: Address.LabelStyle,
   size: Size,
   margin: number,
   regions: ReadonlyArray<RegionTrack>
@@ -55,7 +56,7 @@ export const safeArea = (
           severity: "warning",
           index: start,
           last: i - 1,
-          message: `${region.name} leaves the ${Math.round(margin * 100)}% safe area from ${Address.label(range.rate, start)}, by up to ${worst.toFixed(1)}px at ${Address.format(range.rate, worstAt)}.`,
+          message: `${region.name} leaves the ${Math.round(margin * 100)}% safe area from ${Address.styledLabel(range.rate, start, style)}, by up to ${worst.toFixed(1)}px at ${Address.styledAddress(range.rate, worstAt, style)}.`,
           view: "grid",
           context: [worstAt]
         })
@@ -65,7 +66,11 @@ export const safeArea = (
   })
 }
 
-export const nonMonotonic = (range: FrameRange, tracks: ReadonlyArray<Track>): Array<Finding> =>
+export const nonMonotonic = (
+  range: FrameRange,
+  style: Address.LabelStyle,
+  tracks: ReadonlyArray<Track>
+): Array<Finding> =>
   tracks.flatMap((track) => {
     const samples = knownSamples(track, range)
     const segment = movingSegment(samples)
@@ -92,7 +97,7 @@ export const nonMonotonic = (range: FrameRange, tracks: ReadonlyArray<Track>): A
             severity: "warning",
             index: i,
             last: recover,
-            message: `${track.name} reverses on its way from ${round(v0)} to ${round(v1)}: it reached ${round(extreme)} at ${Address.format(range.rate, extremeAt)}, then went back to ${round(v)} at ${Address.label(range.rate, i)}.`,
+            message: `${track.name} reverses on its way from ${round(v0)} to ${round(v1)}: it reached ${round(extreme)} at ${Address.styledAddress(range.rate, extremeAt, style)}, then went back to ${round(v)} at ${Address.styledLabel(range.rate, i, style)}.`,
             view: "onion",
             context: [extremeAt]
           })

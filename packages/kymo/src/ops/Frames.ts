@@ -308,7 +308,7 @@ export const frames = define({
     const { timeline } = source
     const indices =
       "at" in input ? yield* resolveAddresses(timeline, input.at) : yield* resolveSpan(timeline, input.range)
-    const span = `${Address.format(timeline.rate, indices[0]!)}..${Address.format(timeline.rate, indices[indices.length - 1]!)}`
+    const span = Address.styledSpan(timeline.rate, indices[0]!, indices[indices.length - 1]!, style)
     yield* input.numbersOnly
       ? enforceFrameCap(
           indices.length,
@@ -393,13 +393,13 @@ export const frames = define({
     const notes = [
       ...(skipFirst
         ? [
-            `0f has no previous frame to diff against, so the diff starts at ${Address.format(timeline.rate, drawn[0]!)}.`
+            `0f has no previous frame to diff against, so the diff starts at ${Address.styledAddress(timeline.rate, drawn[0]!, style)}.`
           ]
         : []),
       ...(result.next === null
         ? []
         : [
-            `Showing ${shown} of ${drawn.length} frames. Pass cursor=${result.next} for the rest, or thin the request with a step like range=${Address.format(timeline.rate, first)}..${Address.format(timeline.rate, last)}:${Math.max(2, Math.ceil(indices.length / (DEFAULT_MAX_SHEETS * MAX_PER_SHEET)))}f.`
+            `Showing ${shown} of ${drawn.length} frames. Pass cursor=${result.next} for the rest, or thin the request with a step like range=${Address.styledSpan(timeline.rate, first, last, style, Math.max(2, Math.ceil(indices.length / (DEFAULT_MAX_SHEETS * MAX_PER_SHEET))))}.`
           ])
     ]
     return {

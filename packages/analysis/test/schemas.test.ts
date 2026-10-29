@@ -43,9 +43,13 @@ describe("result schemas", () => {
       conforms(Cuts, cuts)
       conforms(Motion, motion)
       conforms(RegionTrack, region)
-      conforms(EasingFit, Result.getOrThrow(fitEasing(region.x, range.clamp(0, 29))))
-      conforms(CheckReport, yield* check({ source, range, regions: [region], tracks: [region.x] }))
+      conforms(EasingFit, Result.getOrThrow(fitEasing(region.x, range.clamp(0, 29), { labelStyle: "both" })))
+      conforms(
+        CheckReport,
+        yield* check({ labelStyle: "both", source, range, regions: [region], tracks: [region.x] })
+      )
       for (const r of yield* runAssertions({
+        labelStyle: "both",
         source,
         assertions: ["motion < 1 after @cut1"],
         tracks: [motion.track],

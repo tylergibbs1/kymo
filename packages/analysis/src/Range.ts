@@ -44,9 +44,9 @@ export class FrameRange {
     return frameRef(this.rate, index)
   }
 
-  /** The address text for a span of this clock, e.g. `01s10f..02s`. */
+  /** The canonical address of a span of this clock, as JSON fields carry it, e.g. `01s10f..02s`. */
   spanText(from: number, to: number): string {
-    return `${Address.format(this.rate, from)}..${Address.format(this.rate, to)}`
+    return Address.formatSpan(this.rate, from, to)
   }
 
   /** A sub-range, clamped to this one. Callers pass indices they derived from this range. */

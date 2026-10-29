@@ -93,7 +93,13 @@ describe("region tracking", () => {
       const range = yield* FrameRange.whole(source.timeline)
       const region = yield* trackRegion(source, range, { x: 4, y: 6, w: 12, h: 12 }, { name: "logo" })
       // 5% of 48px = 2.4px top margin, of 64px = 3.2px: x=4 is safe; x+w beyond 60.8 is not.
-      const report = yield* check({ source, range, rules: ["safe-area"], regions: [region] })
+      const report = yield* check({
+        labelStyle: "both",
+        source,
+        range,
+        rules: ["safe-area"],
+        regions: [region]
+      })
       expect(report.findings).toHaveLength(1)
       const f = report.findings[0]!
       expect(f.rule).toBe("safe-area")
@@ -124,7 +130,7 @@ describe("easing fit", () => {
           ? source
           : fakeSource({ frames: track.samples.length, fps, scene: () => ({ background: [0, 0, 0] }) })
       const range = yield* FrameRange.whole(s.timeline)
-      return Result.getOrThrow(fitEasing(track, range))
+      return Result.getOrThrow(fitEasing(track, range, { labelStyle: "both" }))
     })
 
   it.effect("picks linear for a linear move and finds its ends", () =>
@@ -171,7 +177,8 @@ describe("easing fit", () => {
       const range = yield* FrameRange.whole(source.timeline)
       const r = fitEasing(
         trackOf("flat", frames, () => 5),
-        range
+        range,
+        { labelStyle: "both" }
       )
       expect(Result.isFailure(r) && r.failure).toMatchObject({ status: "no-motion", track: "flat" })
       expect(Result.isFailure(r) && r.failure.reason).toContain("does not change in 0f..01s29f")
@@ -186,7 +193,7 @@ describe("non-monotonic", () => {
       const range = yield* FrameRange.whole(source.timeline)
       const dips = trackOf("#hero.opacity", 40, (i) => (i === 12 ? 0.2 : Math.min(1, i / 20)))
       const overshoot = trackOf("#card.y", 40, (i) => (i < 10 ? i * 11 : i < 15 ? 110 - (i - 10) * 2 : 100))
-      const report = yield* check({ source, range, tracks: [dips, overshoot] })
+      const report = yield* check({ labelStyle: "both", source, range, tracks: [dips, overshoot] })
       expect(report.rules).toEqual(["non-monotonic"])
       expect(report.findings.map((f) => [f.rule, f.index])).toEqual([["non-monotonic", 12]])
       expect(report.findings[0]!.message).toContain("#hero.opacity")
@@ -202,7 +209,7 @@ describe("non-monotonic", () => {
         i < 70 ? 220 + 9 * i : i < 72 ? 841 - 4 * (i - 69) : Math.min(1020, 843 + 10 * (i - 72))
       const back = { ...trackOf("knob.x", 100, knob), unit: "px" }
       const jitter = { ...trackOf("card.x", 100, (i) => 0.3 * i + (i % 2 === 0 ? 0.25 : -0.25)), unit: "px" }
-      const report = yield* check({ source, range, tracks: [back, jitter] })
+      const report = yield* check({ labelStyle: "both", source, range, tracks: [back, jitter] })
       expect(report.findings.map((f) => [f.message.split(" ")[0], f.index])).toEqual([["knob.x", 70]])
     })
   )

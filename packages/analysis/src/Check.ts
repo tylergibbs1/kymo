@@ -1,4 +1,4 @@
-import { InvalidInput, type KymoError, type Source, type Track } from "@kymo/core"
+import { type Address, InvalidInput, type KymoError, type Source, type Track } from "@kymo/core"
 import { Effect, Schema } from "effect"
 import { detectCuts } from "./Cuts.ts"
 import { Finding, RULES, RuleName } from "./Finding.ts"
@@ -19,6 +19,8 @@ export type CheckReport = typeof CheckReport.Type
 export interface CheckInput {
   readonly source: Source
   readonly range: FrameRange
+  /** How messages name frames. The findings' `address` and `index` are the same in every style. */
+  readonly labelStyle: Address.LabelStyle
   /** Rules to run (see `parseRules`). Default: every rule the inputs allow. */
   readonly rules?: ReadonlyArray<RuleName>
   /** Tracks expected to move one way only, for `non-monotonic`. */
@@ -73,7 +75,7 @@ export const check = (input: CheckInput): Effect.Effect<CheckReport, KymoError> 
     const findings: Array<Finding> = []
     if (pixelRules.length > 0) {
       const s = yield* scan(source, range)
-      const pixels: PixelInput = { scan: s, cuts: detectCuts(s) }
+      const pixels: PixelInput = { scan: s, cuts: detectCuts(s), labelStyle: input.labelStyle }
       for (const r of pixelRules) findings.push(...PIXEL_RULES[r](pixels))
     }
     if (rules.includes("safe-area")) {
@@ -83,7 +85,7 @@ export const check = (input: CheckInput): Effect.Effect<CheckReport, KymoError> 
           "Pass the region as it is at the first frame of the range, e.g. box=120,80,64,64 (CLI: --box 120,80,64,64)."
         )
       }
-      findings.push(...safeArea(range, size, margin, regions))
+      findings.push(...safeArea(range, input.labelStyle, size, margin, regions))
     }
     if (rules.includes("non-monotonic")) {
       if (tracks.length === 0) {
@@ -92,7 +94,7 @@ export const check = (input: CheckInput): Effect.Effect<CheckReport, KymoError> 
           "Name them, e.g. tracks=box.x,#hero.opacity."
         )
       }
-      findings.push(...nonMonotonic(range, tracks))
+      findings.push(...nonMonotonic(range, input.labelStyle, tracks))
     }
     findings.sort((a, b) => a.index - b.index || RULES.indexOf(a.rule) - RULES.indexOf(b.rule))
     return { rules: [...rules], findings }

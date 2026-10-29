@@ -7,10 +7,11 @@ import type { Scan } from "./Scan.ts"
 import { maxHeldFrames, signals } from "./Signals.ts"
 import { median } from "./Stats.ts"
 
-/** What the pixel rules read: one scan and the cuts found in it. */
+/** What the pixel rules read: one scan, the cuts found in it, and how messages label frames. */
 export interface PixelInput {
   readonly scan: Scan
   readonly cuts: Cuts
+  readonly labelStyle: Address.LabelStyle
 }
 
 /** Mean luma below this is black: repeated black frames are black-frames' finding. */
@@ -71,13 +72,15 @@ const fpsText = (fps: number) => `${Number.isInteger(fps) ? fps : fps.toFixed(2)
 /** One finding for a regular cadence of repeated or skipped frames. */
 const cadenceFinding = (
   range: FrameRange,
+  style: Address.LabelStyle,
   rule: "duplicate-frames" | "dropped-frames",
   c: Cadence
 ): Finding => {
   const fps = fpsOf(range.rate)
   const first = range.first + c.events[0]!
   const last = range.first + c.events[c.events.length - 1]!
-  const where = `from ${Address.label(range.rate, first)} to ${Address.label(range.rate, last)}`
+  const label = (i: number) => Address.styledLabel(range.rate, i, style)
+  const where = `from ${label(first)} to ${label(last)}`
   const every =
     c.perPeriod === 1 ? `Every ${ordinal(c.period)} frame` : `${c.perPeriod} of every ${c.period} frames`
   const repeated = rule === "duplicate-frames"
@@ -101,6 +104,7 @@ const cadenceFinding = (
  */
 export const duplicateFrames = (input: PixelInput): Array<Finding> => {
   const { range, frames } = input.scan
+  const label = (i: number) => Address.styledLabel(range.rate, i, input.labelStyle)
   const sig = signals(input.scan)
   const { hard } = transitions(input)
   const maxHeld = maxHeldFrames(input.scan)
@@ -129,14 +133,15 @@ export const duplicateFrames = (input: PixelInput): Array<Finding> => {
         last: range.first + b,
         message:
           count === 1
-            ? `${Address.label(range.rate, first)} repeats the frame before it while the picture is moving: a held or duplicated frame.`
-            : `${count} frames in a row, ${Address.label(range.rate, first)} to ${Address.label(range.rate, range.first + b)}, each repeats the frame before it while the picture is moving.`,
+            ? `${label(first)} repeats the frame before it while the picture is moving: a held or duplicated frame.`
+            : `${count} frames in a row, ${label(first)} to ${label(range.first + b)}, each repeats the frame before it while the picture is moving.`,
         view: "diff"
       })
     })
-  return [...irregular, ...regular.map((c) => cadenceFinding(range, "duplicate-frames", c))].sort(
-    (a, b) => a.index - b.index
-  )
+  return [
+    ...irregular,
+    ...regular.map((c) => cadenceFinding(range, input.labelStyle, "duplicate-frames", c))
+  ].sort((a, b) => a.index - b.index)
 }
 
 /** Each side of a frame needs this many steadily moving neighbours, and both sides together `2 * STEADY_RADIUS - 1`. */
@@ -170,6 +175,8 @@ const steadySides = (
  */
 export const droppedFrames = (input: PixelInput): Array<Finding> => {
   const { range, frames } = input.scan
+  const label = (i: number) => Address.styledLabel(range.rate, i, input.labelStyle)
+  const address = (i: number) => Address.styledAddress(range.rate, i, input.labelStyle)
   const sig = signals(input.scan)
   const { any } = transitions(input)
   const maxHeld = maxHeldFrames(input.scan)
@@ -209,30 +216,28 @@ export const droppedFrames = (input: PixelInput): Array<Finding> => {
     .map(([k, ratio]) => {
       const i = range.first + k
       const hold = holdBefore.get(k)
-      const motion = `Motion into ${Address.label(range.rate, i)} is ${ratio.toFixed(1)}x its steady neighbours, as big as two steps of their motion`
+      const motion = `Motion into ${label(i)} is ${ratio.toFixed(1)}x its steady neighbours, as big as two steps of their motion`
       if (hold === undefined)
         return finding(range, {
           rule: "dropped-frames",
           severity: "warning",
           index: i,
-          message: `${motion}: a frame between ${Address.format(range.rate, i - 1)} and ${Address.format(range.rate, i)} looks dropped.`,
+          message: `${motion}: a frame between ${address(i - 1)} and ${address(i)} looks dropped.`,
           view: "diff"
         })
       const [a, b] = [range.first + hold[0], range.first + hold[1]]
-      const held =
-        a === b
-          ? Address.label(range.rate, a)
-          : `${Address.label(range.rate, a)} to ${Address.label(range.rate, b)}`
+      const held = a === b ? label(a) : `${label(a)} to ${label(b)}`
       return finding(range, {
         rule: "dropped-frames",
         severity: "warning",
         index: i,
         context: [a, b],
-        message: `${motion}: ${Address.format(range.rate, i)} skips a step after the hold at ${held}, so the frame that should have shown that step was dropped.`,
+        message: `${motion}: ${address(i)} skips a step after the hold at ${held}, so the frame that should have shown that step was dropped.`,
         view: "diff"
       })
     })
-  return [...irregular, ...regular.map((c) => cadenceFinding(range, "dropped-frames", c))].sort(
-    (a, b) => a.index - b.index
-  )
+  return [
+    ...irregular,
+    ...regular.map((c) => cadenceFinding(range, input.labelStyle, "dropped-frames", c))
+  ].sort((a, b) => a.index - b.index)
 }

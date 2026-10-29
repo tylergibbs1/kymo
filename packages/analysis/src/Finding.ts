@@ -1,4 +1,4 @@
-import { FrameIndex, FramesView, InvalidInput } from "@kymo/core"
+import { Address, FrameIndex, FramesView, InvalidInput } from "@kymo/core"
 import { Result, Schema } from "effect"
 import type { FrameRange } from "./Range.ts"
 
@@ -74,7 +74,7 @@ const suggestAt = (
   if (b - a + 1 <= MAX_LISTED + 2) return Array.from({ length: b - a + 1 }, (_, k) => fmt(a + k))
   const step = Math.ceil((b - a) / (STEPPED_FRAMES - 1))
   const extra = [...new Set([index, last, b, ...context].filter((i) => inside(i) && (i - a) % step !== 0))]
-  return [`${range.spanText(a, b)}:${step}f`, ...extra.sort((x, y) => x - y).map(fmt)]
+  return [Address.formatSpan(range.rate, a, b, step), ...extra.sort((x, y) => x - y).map(fmt)]
 }
 
 /**

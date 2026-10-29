@@ -28,6 +28,8 @@ export type AssertionResult = typeof AssertionResult.Type
 /** What assertions are evaluated against. Markers here are added to the Timeline's own. */
 export interface AssertContext {
   readonly timeline: Timeline
+  /** How messages name frames. `address` is the same in every style. */
+  readonly labelStyle: Address.LabelStyle
   readonly tracks: ReadonlyMap<string, Track>
   readonly markers?: ReadonlyArray<Marker>
 }
@@ -103,6 +105,7 @@ export const evaluate = (
   const rctx = { ...resolveContext(ctx.timeline), markers }
   const rate = ctx.timeline.rate
   const resolve = (a: Address.Address) => Address.resolve(rctx, a)
+  const label = (i: number) => Address.styledLabel(rate, i, ctx.labelStyle)
   const result = (pass: boolean, observed: number | null, at: number | undefined, message: string) =>
     ({
       assertion: assertion.text,
@@ -136,7 +139,7 @@ export const evaluate = (
         pass,
         i,
         i,
-        `@${marker.name} is at ${Address.label(rate, i)}, ${pass ? "" : "not "}${assertion.relation} ${assertion.where.text}.`
+        `@${marker.name} is at ${label(i)}, ${pass ? "" : "not "}${assertion.relation} ${assertion.where.text}.`
       )
     })
   }
@@ -159,7 +162,7 @@ export const evaluate = (
           false,
           round(v, 6),
           i,
-          `${track.name} is ${round(v, 6)} at ${Address.label(rate, i)}, which is not ${op} ${value} (${where}).`
+          `${track.name} is ${round(v, 6)} at ${label(i)}, which is not ${op} ${value} (${where}).`
         )
       }
     }
@@ -172,7 +175,7 @@ export const evaluate = (
       true,
       round(v, 6),
       firstKnown,
-      `${track.name} is ${op} ${value}${stays} (${where}); ${round(v, 6)} at ${Address.label(rate, firstKnown)}.`
+      `${track.name} is ${op} ${value}${stays} (${where}); ${round(v, 6)} at ${label(firstKnown)}.`
     )
   })
 }
@@ -180,6 +183,8 @@ export const evaluate = (
 export interface AssertInput {
   readonly source: Source
   readonly assertions: ReadonlyArray<string>
+  /** How messages name frames. `address` is the same in every style. */
+  readonly labelStyle: Address.LabelStyle
   /** Tracks not on the source, such as `motion` or a tracked region's `box.x`. */
   readonly tracks?: ReadonlyArray<Track>
   /** Markers not on the source, such as `cut1` or `peak1`. */
@@ -198,7 +203,12 @@ export const runAssertions = (input: AssertInput): Effect.Effect<ReadonlyArray<A
       if (!available.includes(a.track)) return yield* Effect.fail(unknownTrack(a.track, available))
       tracks.set(a.track, yield* input.source.track(a.track))
     }
-    const ctx: AssertContext = { timeline: input.source.timeline, tracks, markers: input.markers ?? [] }
+    const ctx: AssertContext = {
+      timeline: input.source.timeline,
+      labelStyle: input.labelStyle,
+      tracks,
+      markers: input.markers ?? []
+    }
     const out: Array<AssertionResult> = []
     for (const a of parsed) out.push(yield* Effect.fromResult(evaluate(a, ctx)))
     return out

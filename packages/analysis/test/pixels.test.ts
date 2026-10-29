@@ -68,7 +68,7 @@ describe("cuts, motion and flicker", () => {
         Effect.gen(function* () {
           const flashing = fakeSource({ frames: 40, scene })
           const range = yield* FrameRange.whole(flashing.timeline)
-          const report = yield* check({ source: flashing, range, rules: ["flicker"] })
+          const report = yield* check({ labelStyle: "both", source: flashing, range, rules: ["flicker"] })
           return report.findings.map((f) => [f.index, f.severity])
         })
       // The whole light page goes white: a small step in mean luma, but every pixel flashes.
@@ -83,7 +83,7 @@ describe("cuts, motion and flicker", () => {
   it.effect("flags the flash as flicker at the exact frame", () =>
     Effect.gen(function* () {
       const range = yield* FrameRange.whole(source.timeline)
-      const report = yield* check({ source, range, rules: ["flicker"] })
+      const report = yield* check({ labelStyle: "both", source, range, rules: ["flicker"] })
       expect(report.findings.map((f) => [f.rule, f.index, f.severity])).toEqual([["flicker", 20, "error"]])
       expect(report.findings[0]!.suggest).toEqual({
         tool: "kymo_frames",
@@ -124,6 +124,7 @@ describe("frame-timing rules", () => {
     Effect.gen(function* () {
       const range = yield* FrameRange.whole(source.timeline)
       const report = yield* check({
+        labelStyle: "both",
         source,
         range,
         rules: ["duplicate-frames", "dropped-frames", "black-frames"]
@@ -146,7 +147,7 @@ describe("frame-timing rules", () => {
         scene: (i) => shotA(4 + (i >= 40 && i <= 42 ? 39 : i))
       })
       const range = yield* FrameRange.whole(stalled.timeline)
-      const report = yield* check({ source: stalled, range, rules: ["duplicate-frames"] })
+      const report = yield* check({ labelStyle: "both", source: stalled, range, rules: ["duplicate-frames"] })
       expect(report.findings.map((f) => [f.index, f.span ?? null])).toEqual([[40, "01s10f..01s12f"]])
     })
   )
@@ -167,7 +168,7 @@ describe("frame-timing rules", () => {
               : shotA(14 + (i - 90))
       const still = fakeSource({ frames: 100, scene })
       const range = yield* FrameRange.whole(still.timeline)
-      const report = yield* check({ source: still, range, rules: ["duplicate-frames"] })
+      const report = yield* check({ labelStyle: "both", source: still, range, rules: ["duplicate-frames"] })
       expect(report.findings).toEqual([])
     })
   )
@@ -176,7 +177,9 @@ describe("frame-timing rules", () => {
     Effect.gen(function* () {
       const telemetry = fakeSource({ frames: 10, scene: () => black, size: null })
       const range = yield* FrameRange.whole(telemetry.timeline)
-      const error = yield* Effect.flip(check({ source: telemetry, range, rules: ["flicker"] }))
+      const error = yield* Effect.flip(
+        check({ labelStyle: "both", source: telemetry, range, rules: ["flicker"] })
+      )
       expect(error._tag).toBe("InvalidInput")
       expect(error.hint).toContain("rules=non-monotonic")
     })

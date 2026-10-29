@@ -11,7 +11,7 @@ import {
   sample,
   scan as scanFrames
 } from "@kymo/analysis"
-import { FRAME_CAP, frameIndex } from "@kymo/core"
+import { Address, FRAME_CAP, frameIndex } from "@kymo/core"
 import { DEFAULT_MAX_SHEETS, MAX_PER_SHEET } from "@kymo/layout"
 import { Workspace } from "@kymo/sources"
 import { sheet } from "@kymo/views"
@@ -136,9 +136,20 @@ const omittedNote = (
   return `${omitted.length} of ${total} cuts not shown: ${names.join(", ")}${more}. To see them, ${how}, or range=@${first}-1f..@${first}+12f for one.`
 }
 
+interface Suggested {
+  readonly first: number
+  readonly last: number
+  readonly reason: string
+}
+
 /** Ranges worth a closer look: around each cut (strongest first), the busiest windows, the top motion peak. */
-const suggest = (range: FrameRange, motion: Motion, cuts: Cuts): Array<typeof Suggestion.Type> => {
-  const out: Array<{ readonly first: number; readonly last: number; readonly reason: string }> = []
+const suggest = (
+  range: FrameRange,
+  motion: Motion,
+  cuts: Cuts,
+  style: Address.LabelStyle
+): Array<Suggested> => {
+  const out: Array<Suggested> = []
   const add = (first: number, last: number, reason: string) => {
     const a = Math.max(range.first, first)
     const b = Math.min(range.last, last)
@@ -150,14 +161,12 @@ const suggest = (range: FrameRange, motion: Motion, cuts: Cuts): Array<typeof Su
     add(
       c.from.index - pad,
       c.to.index + pad,
-      `around ${c.marker.name} (${c.kind} cut at ${c.marker.address})`
+      `around ${c.marker.name} (${c.kind} cut at ${Address.styledAddress(range.rate, c.marker.index, style)})`
     )
   for (const w of motion.windows) add(w.from.index, w.to.index, `busiest motion (mean energy ${w.mean})`)
   const peak = motion.peaks[0]
   if (peak) add(peak.marker.index - pad, peak.marker.index + pad, `around the strongest motion peak`)
-  return out
-    .slice(0, MAX_SUGGESTIONS)
-    .map((s) => ({ range: range.spanText(s.first, s.last), reason: s.reason }))
+  return out.slice(0, MAX_SUGGESTIONS)
 }
 
 export const scan = define({
@@ -199,9 +208,11 @@ export const scan = define({
       labelStyle: style,
       cursor: input.cursor
     })
-    const suggestions = suggest(range, motion, cuts)
+    const suggested = suggest(range, motion, cuts, style)
+    const suggestions = suggested.map((s) => ({ range: range.spanText(s.first, s.last), reason: s.reason }))
     const detailed = input.format === "detailed"
-    const focus = suggestions[0]?.range ?? range.spanText(range.first, range.last)
+    const [best = range] = suggested
+    const focus = Address.styledSpan(range.rate, best.first, best.last, style)
     const notes = [
       truncationNote(
         picked.length,

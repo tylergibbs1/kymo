@@ -1,7 +1,10 @@
 import { Address } from "@kymo/core"
 import { Context, Layer } from "effect"
 
-/** How operations label frames on images and in sheet labels. JSON `address`/`index` never change. */
+/**
+ * How operations name frames on images, in sheet labels, and in messages, reasons and notes. JSON
+ * `address`/`index` fields never change.
+ */
 export class FrameLabels extends Context.Service<FrameLabels, { readonly style: Address.LabelStyle }>()(
   "kymo/FrameLabels"
 ) {

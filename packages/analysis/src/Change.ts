@@ -181,7 +181,7 @@ export const Changes = Schema.TaggedStruct("changes", {
     Schema.makeFilter((c) =>
       c.settles === null || c.settles.index >= c.starts.index
         ? undefined
-        : `settles at ${c.settles.address}, before it starts at ${c.starts.address}`
+        : `settles at #${c.settles.index}, before it starts at #${c.starts.index}`
     )
   )
   .pipe(Schema.brand("Changes"))

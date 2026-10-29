@@ -35,7 +35,9 @@ describe("easing fit only fits a motion seen whole", () => {
       const range = yield* FrameRange.whole(source.timeline)
       const curve = moving(easeInOut)
       const track = px((i) => (i < 20 ? curve(i) : null))
-      const r = unfit(fitEasing(track, range, { lost: [lostSpan(range, 20, 59, "low-confidence")] }))
+      const r = unfit(
+        fitEasing(track, range, { labelStyle: "both", lost: [lostSpan(range, 20, 59, "low-confidence")] })
+      )
       expect(r.status).toBe("partial")
       expect(r.from?.index).toBe(20)
       expect(r.reason).toContain("lost from 20f")
@@ -50,7 +52,8 @@ describe("easing fit only fits a motion seen whole", () => {
         unfit(
           fitEasing(
             px((i) => (i === 25 ? null : curve(i))),
-            range
+            range,
+            { labelStyle: "both" }
           )
         ).status
       ).toBe("partial")
@@ -64,7 +67,9 @@ describe("easing fit only fits a motion seen whole", () => {
       // Visible until it passes 260 (frame 32), then outside the frame.
       const track = px((i) => (curve(i) <= 260 ? curve(i) : null))
       const lostFrom = track.samples.findIndex((v) => v === null)
-      const r = Result.getOrThrow(fitEasing(track, range, { lost: [lostSpan(range, lostFrom, 59, "edge")] }))
+      const r = Result.getOrThrow(
+        fitEasing(track, range, { labelStyle: "both", lost: [lostSpan(range, lostFrom, 59, "edge")] })
+      )
       expect([r.start, r.end]).toEqual(["rest", "disappeared"])
       expect(r.best.family).toBe("ease-in-out")
       expect(r.from.index).toBe(10)
@@ -79,7 +84,9 @@ describe("easing fit only fits a motion seen whole", () => {
       const curve = moving((x) => x)
       const track = px((i) => (curve(i) <= 220 ? curve(i) : null))
       const lostFrom = track.samples.findIndex((v) => v === null)
-      const r = unfit(fitEasing(track, range, { lost: [lostSpan(range, lostFrom, 59, "edge")] }))
+      const r = unfit(
+        fitEasing(track, range, { labelStyle: "both", lost: [lostSpan(range, lostFrom, 59, "edge")] })
+      )
       expect(r.status).toBe("partial")
       expect(r.reason).toContain("the end of the motion is not determined")
     })
@@ -91,7 +98,9 @@ describe("easing fit only fits a motion seen whole", () => {
       const curve = moving(easeOut)
       // Invisible up to frame 10 (where it starts moving), then seen.
       const track = px((i) => (i <= 10 ? null : curve(i)))
-      const r = Result.getOrThrow(fitEasing(track, range, { lost: [lostSpan(range, 0, 10, "faded")] }))
+      const r = Result.getOrThrow(
+        fitEasing(track, range, { labelStyle: "both", lost: [lostSpan(range, 0, 10, "faded")] })
+      )
       expect([r.start, r.end]).toEqual(["appeared", "rest"])
       expect(r.best.family).toBe("ease-out")
       expect([r.from.index, r.to.index]).toEqual([10, 40])
@@ -105,14 +114,15 @@ describe("easing fit never invents a curve", () => {
     Effect.gen(function* () {
       const range = yield* FrameRange.whole(source.timeline)
       const jitter = px((i) => 280 + 0.11 * Math.sin(i * 1.7))
-      const r = unfit(fitEasing(jitter, range))
+      const r = unfit(fitEasing(jitter, range, { labelStyle: "both" }))
       expect(r.status).toBe("no-motion")
       expect(r.reason).toContain("2 px")
       expect(
         unfit(
           fitEasing(
             px((i) => (i < 30 ? 80 : 80.05)),
-            range
+            range,
+            { labelStyle: "both" }
           )
         ).status
       ).toBe("no-motion")
@@ -127,7 +137,7 @@ describe("easing fit never invents a curve", () => {
         unit: "0..1",
         samples: Array.from({ length: frames }, (_, i) => (i < 30 ? 0.5 : 0.51))
       }
-      expect(unfit(fitEasing(small, range)).status).toBe("no-motion")
+      expect(unfit(fitEasing(small, range, { labelStyle: "both" })).status).toBe("no-motion")
     })
   )
 
@@ -142,7 +152,7 @@ describe("easing fit never invents a curve", () => {
           i < 10 || i > 40 ? 1 : i % 3 === 0 ? 0.87 : i % 3 === 1 ? 0.94 : 0.89
         )
       }
-      const r = unfit(fitEasing(dip, range))
+      const r = unfit(fitEasing(dip, range, { labelStyle: "both" }))
       expect(r.status).toBe("no-motion")
       expect(r.reason).toContain("returns")
     })
@@ -152,7 +162,7 @@ describe("easing fit never invents a curve", () => {
     Effect.gen(function* () {
       const range = yield* FrameRange.whole(source.timeline)
       const jump = px((i) => (i < 10 ? 100 : i === 10 ? 160 : i === 11 ? 240 : 300))
-      const r = unfit(fitEasing(jump, range))
+      const r = unfit(fitEasing(jump, range, { labelStyle: "both" }))
       expect(r.status).toBe("too-few-samples")
     })
   )
@@ -161,7 +171,9 @@ describe("easing fit never invents a curve", () => {
     Effect.gen(function* () {
       const range = yield* FrameRange.whole(source.timeline)
       const anchorOnly = px((i) => (i === 0 ? 400 : null))
-      const r = unfit(fitEasing(anchorOnly, range, { lost: [lostSpan(range, 1, 59, "low-confidence")] }))
+      const r = unfit(
+        fitEasing(anchorOnly, range, { labelStyle: "both", lost: [lostSpan(range, 1, 59, "low-confidence")] })
+      )
       expect(r.status).toBe("lost")
       expect(r.reason).not.toContain("change")
       expect(
@@ -169,7 +181,7 @@ describe("easing fit never invents a curve", () => {
           fitEasing(
             px(() => null),
             range,
-            { lost: [lostSpan(range, 0, 59, "edge")] }
+            { labelStyle: "both", lost: [lostSpan(range, 0, 59, "edge")] }
           )
         ).status
       ).toBe("lost")

@@ -16,7 +16,7 @@ const FLICKER_STEP = 0.06
  */
 const FLICKER_ERROR_AREA = 0.25
 
-export const flicker = ({ scan }: PixelInput): Array<Finding> => {
+export const flicker = ({ scan, labelStyle }: PixelInput): Array<Finding> => {
   const { range } = scan
   const l = scan.frames.map((f) => f.luma)
   const levels = scan.frames.flatMap((f) => (f.levels === null ? [] : [f.levels]))
@@ -45,14 +45,14 @@ export const flicker = ({ scan }: PixelInput): Array<Finding> => {
         rule: "flicker",
         severity: area >= FLICKER_ERROR_AREA ? "error" : "warning",
         index: i,
-        message: `${Address.label(range.rate, i)} is ${up > 0 ? "brighter" : "darker"} than both neighbours by ${(step * 100).toFixed(0)}% luma for one frame, over ${(area * 100).toFixed(0)}% of the frame: a flicker.`,
+        message: `${Address.styledLabel(range.rate, i, labelStyle)} is ${up > 0 ? "brighter" : "darker"} than both neighbours by ${(step * 100).toFixed(0)}% luma for one frame, over ${(area * 100).toFixed(0)}% of the frame: a flicker.`,
         view: "diff"
       })
     ]
   })
 }
 
-export const blackFrames = ({ scan }: PixelInput): Array<Finding> => {
+export const blackFrames = ({ scan, labelStyle }: PixelInput): Array<Finding> => {
   const { range } = scan
   return runs(scan.frames.map((f) => f.luma < BLACK)).map(([a, b]) => {
     const first = range.first + a
@@ -64,7 +64,7 @@ export const blackFrames = ({ scan }: PixelInput): Array<Finding> => {
       severity: atEdge ? "info" : "warning",
       index: first,
       last,
-      message: `${count} near-black frame${count > 1 ? "s" : ""} from ${Address.label(range.rate, first)}${atEdge ? " at the edge of the range (a fade in or out?)" : " in the middle of the range"}.`,
+      message: `${count} near-black frame${count > 1 ? "s" : ""} from ${Address.styledLabel(range.rate, first, labelStyle)}${atEdge ? " at the edge of the range (a fade in or out?)" : " in the middle of the range"}.`,
       view: "sheet"
     })
   })

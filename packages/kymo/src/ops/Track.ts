@@ -26,6 +26,7 @@ import { Workspace } from "@kymo/sources"
 import { plot as plotView } from "@kymo/views"
 import { Effect, Result, Schema } from "effect"
 import { BoxText, Format, Range, Source as SourceField, TargetInput } from "../Fields.ts"
+import { FrameLabels } from "../FrameLabels.ts"
 import { analysisRange, resolveAddresses } from "../Frames.ts"
 import { define } from "../Operation.ts"
 import { OutputDir } from "../OutputDir.ts"
@@ -280,7 +281,11 @@ interface Frames {
  * The range and anchor. A range written backwards (30f..12f) covers 12f..30f and anchors at 30f, so
  * a box read off the frame where the subject is fully visible can be followed back to where it appears.
  */
-const framesOf = (input: TrackInput, timeline: Source["timeline"]): Effect.Effect<Frames, KymoError> =>
+const framesOf = (
+  input: TrackInput,
+  timeline: Source["timeline"],
+  style: Address.LabelStyle
+): Effect.Effect<Frames, KymoError> =>
   Effect.gen(function* () {
     const text = input.range
     let frames: Frames | undefined
@@ -307,11 +312,11 @@ const framesOf = (input: TrackInput, timeline: Source["timeline"]): Effect.Effec
       )
     const at = yield* resolveAddresses(timeline, [input.anchor])
     const { range } = frames
-    const span = range.spanText(range.first, range.last)
+    const span = Address.styledSpan(range.rate, range.first, range.last, style)
     if (at.length !== 1 || at[0]! < range.first || at[0]! > range.last)
       return yield* invalid(
         `anchor ${input.anchor} is not one frame inside ${span}.`,
-        `Pass one frame inside the range, e.g. anchor=${Address.format(range.rate, range.last)}, or widen the range to include it.`
+        `Pass one frame inside the range, e.g. anchor=${Address.styledAddress(range.rate, range.last, style)}, or widen the range to include it.`
       )
     return { range, anchor: at[0]! }
   })
@@ -406,12 +411,18 @@ const changeSummary = (c: BoxChange, range: FrameRange): ChangeSummary => {
 }
 
 /** What to tell the caller about a lost box: a wrong box at the anchor, or the subject leaving or fading. */
-const lostNotes = (input: TrackInput, region: RegionTrack, frames: Frames, handle: string) => {
+const lostNotes = (
+  input: TrackInput,
+  region: RegionTrack,
+  frames: Frames,
+  handle: string,
+  style: Address.LabelStyle
+) => {
   const { range, anchor } = frames
   const notes: Array<string> = []
   const next = region.lost.find((l) => l.from.index === anchor + 1 || l.to.index === anchor - 1)
   if (next?.reason === "low-confidence" && "box" in input) {
-    const at = Address.format(range.rate, anchor)
+    const at = Address.styledAddress(range.rate, anchor, style)
     const which = anchor === range.first ? "the first frame of the range" : "the anchor frame"
     const [, , w, h] = input.box.split(",").map((p) => p.trim())
     const rangeFlag = input.range === undefined ? "" : ` --range ${input.range}`
@@ -423,7 +434,7 @@ const lostNotes = (input: TrackInput, region: RegionTrack, frames: Frames, handl
   const spans = (reason: LostReason) =>
     region.lost
       .filter((l) => l.reason === reason)
-      .map((l) => range.spanText(l.from.index, l.to.index))
+      .map((l) => Address.styledSpan(range.rate, l.from.index, l.to.index, style))
       .join(", ")
   const edge = spans("edge")
   if (edge !== "")
@@ -456,9 +467,10 @@ export const track = define({
   run: Effect.fn("kymo.track")(function* (input: TrackInput) {
     const workspace = yield* Workspace
     const output = yield* OutputDir
+    const { style } = yield* FrameLabels
     const source = yield* workspace.open(input.source)
     const { timeline } = source
-    const frames = yield* framesOf(input, timeline)
+    const frames = yield* framesOf(input, timeline, style)
     const { range } = frames
     const measured = yield* measure(input, source, frames)
     const detailed = input.format === "detailed"
@@ -497,12 +509,16 @@ export const track = define({
       : undefined
     const lost = measured.region?.lost ?? []
     const fits = input.fitEasing
-      ? measured.tracks.filter((m) => m.role === "value").map(({ track: t }) => fitEasing(t, range, { lost }))
+      ? measured.tracks
+          .filter((m) => m.role === "value")
+          .map(({ track: t }) => fitEasing(t, range, { lost, labelStyle: style }))
       : []
     const skipped = fits.flatMap((r) => (Result.isFailure(r) ? [r.failure] : []))
-    const span = range.spanText(range.first, range.last)
+    const span = Address.styledSpan(range.rate, range.first, range.last, style)
     const notes = [
-      ...(measured.region === undefined ? [] : lostNotes(input, measured.region, frames, timeline.handle)),
+      ...(measured.region === undefined
+        ? []
+        : lostNotes(input, measured.region, frames, timeline.handle, style)),
       ...(measured.change?.timing._tag === "changes" && measured.change.timing.settles === null
         ? [
             `The box still changes at the last frame, so it has not settled in ${span}; widen the range to see where it settles.`

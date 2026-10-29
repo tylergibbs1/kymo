@@ -19,8 +19,8 @@ export const exampleBox = (size: Size): string =>
     .join(",")
 
 /** How to find a box: look at the range's first frame on a grid. */
-export const findBoxHint = (source: Source, range: FrameRange): string =>
-  `find it with kymo frames ${source.timeline.handle} --at ${Address.format(range.rate, range.first)} --view grid`
+export const findBoxHint = (source: Source, range: FrameRange, style: Address.LabelStyle): string =>
+  `find it with kymo frames ${source.timeline.handle} --at ${Address.styledAddress(range.rate, range.first, style)} --view grid`
 
 /** `box` text parsed against the source's frame size. */
 export const boxOn = (source: Source, box: string): Effect.Effect<Box, KymoError> =>

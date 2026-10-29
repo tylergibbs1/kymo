@@ -21,7 +21,7 @@ const motion = trackOf("motion", frames, (i) => (i <= 50 ? 0.05 : 0.001))
 const settle = { name: "settle", index: frameIndex(50), address: "01s20f", origin: "agent" as const }
 
 const run = (...assertions: Array<string>) =>
-  runAssertions({ source, assertions, tracks: [motion], markers: [settle] })
+  runAssertions({ labelStyle: "both", source, assertions, tracks: [motion], markers: [settle] })
 
 describe("assertions", () => {
   it.effect("pass and fail against tracks and markers", () =>

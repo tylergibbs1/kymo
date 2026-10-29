@@ -17,6 +17,7 @@ import { Workspace } from "@kymo/sources"
 import { Effect, Schema } from "effect"
 import { BoxText, Range, Source as SourceField } from "../Fields.ts"
 import { analysisRange } from "../Frames.ts"
+import { FrameLabels } from "../FrameLabels.ts"
 import { define, jsonLines, optionHint } from "../Operation.ts"
 import { exampleBox, findBoxHint, measureBox, measureChange } from "../Region.ts"
 
@@ -209,6 +210,7 @@ export const check = define({
   lines: jsonLines(CheckOutput, "findings"),
   run: Effect.fn("kymo.check")(function* (input: typeof CheckInput.Type) {
     const workspace = yield* Workspace
+    const { style } = yield* FrameLabels
     const source = yield* workspace.open(input.source)
     const { timeline } = source
     const range = yield* analysisRange(timeline, input.range)
@@ -218,7 +220,7 @@ export const check = define({
     const boxHint =
       timeline.size === null
         ? "Pass a source with pixels and its box"
-        : `Pass the box as it is at the first frame of the range, e.g. ${optionHint(CheckInput.fields, "box", exampleBox(timeline.size))}; ${findBoxHint(source, range)}`
+        : `Pass the box as it is at the first frame of the range, e.g. ${optionHint(CheckInput.fields, "box", exampleBox(timeline.size))}; ${findBoxHint(source, range, style)}`
     if (input.rules?.includes("safe-area") && regions.length === 0 && timeline.size !== null)
       return yield* invalid(
         `safe-area needs the box of what must stay inside the frame, and ${timeline.handle} has no box.* tracks.`,
@@ -229,6 +231,7 @@ export const check = define({
     const report = yield* runCheck({
       source,
       range,
+      labelStyle: style,
       ...(rules === undefined ? {} : { rules }),
       ...(input.safeMargin === undefined ? {} : { safeMargin: input.safeMargin }),
       tracks: yield* monotonicTracks(input, rules, own, measured, boxHint),
@@ -256,6 +259,7 @@ export const check = define({
         : yield* runAssertions({
             source,
             assertions: input.assert,
+            labelStyle: style,
             tracks: derived.tracks,
             markers: derived.markers
           })

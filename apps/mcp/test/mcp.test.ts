@@ -1,7 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js"
-import { FramesOutput, ProbeOutput } from "kymo"
+import { CheckOutput, FramesOutput, ProbeOutput } from "kymo"
 import { Schema } from "effect"
 import { McpProtocol } from "effect/ai"
 import { spawn, spawnSync } from "node:child_process"
@@ -199,6 +199,34 @@ describe("kymo MCP server", () => {
     expect(frames(index).map((f) => f.address)).toEqual(["0f", "01s", "02s29f"])
     const description = index.tools.find((t) => t.name === "kymo_frames")!.description
     expect(description).toContain("Labels show `#250`")
+  })
+
+  it("KYMO_LABEL_STYLE=index labels frames #N in check messages; address and index stay the same", async () => {
+    const args = {
+      source: "synthetic:flicker?at=40",
+      rules: ["flicker"],
+      assert: ["@flicker within #38..#42"]
+    }
+    const result = (r: { structuredContent?: unknown }) =>
+      Schema.decodeUnknownSync(CheckOutput)(r.structuredContent)
+    const plain = result(await call("kymo_check", args))
+    const index = result(await callWith({ KYMO_LABEL_STYLE: "index" }, "kymo_check", args))
+    const timecode = result(await callWith({ KYMO_LABEL_STYLE: "timecode" }, "kymo_check", args))
+    const [finding] = index.findings
+    expect(finding).toMatchObject({ rule: "flicker", address: "01s10f", index: 40 })
+    expect(finding!.message).toMatch(/^#40 is brighter/)
+    expect(plain.findings[0]!.message).toMatch(/^01s10f #40 is brighter/)
+    expect(timecode.findings[0]!.message).toMatch(/^01s10f is brighter/)
+    expect(index.assertions[0]!.message).toBe("@flicker is at #40, within #38..#42.")
+    expect(index.assertions[0]!.address).toBe(plain.assertions[0]!.address)
+    // Only the prose changes: what an agent passes back is the same in every style.
+    const addresses = (f: (typeof CheckOutput.Type)["findings"][number]) => [
+      f.address,
+      f.index,
+      f.span,
+      f.suggest.arguments.at
+    ]
+    expect(addresses(finding!)).toEqual(addresses(plain.findings[0]!))
   })
 
   it("KYMO_TEXT_FORMAT=markdown changes only the text block next to structuredContent", async () => {

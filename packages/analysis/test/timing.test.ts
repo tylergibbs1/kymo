@@ -29,7 +29,12 @@ const timing = (scene: (i: number) => Scene, frames: number) =>
   Effect.gen(function* () {
     const source = fakeSource({ frames, fps: 60, scene })
     const range = yield* FrameRange.whole(source.timeline)
-    const report = yield* check({ source, range, rules: ["duplicate-frames", "dropped-frames"] })
+    const report = yield* check({
+      labelStyle: "both",
+      source,
+      range,
+      rules: ["duplicate-frames", "dropped-frames"]
+    })
     const s = yield* scan(source, range)
     return { findings: report.findings, motion: motionEnergy(s, detectCuts(s)) }
   })
