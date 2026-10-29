@@ -22,9 +22,6 @@ import {
 /** Sub-pixel tracker jitter: below the 1 px a change needs to be visible, so not motion. */
 const JITTER_PX = 0.5
 
-/** kymo's stillness floor for motion energy (mean absolute luma difference, 0..1). */
-const STILL_FLOOR = 0.002
-
 type Series = ReadonlyArray<number | null>
 
 /** Fill unknown samples from the last known one; fails if the first frame is unknown. */
@@ -60,9 +57,20 @@ const frameSize = (outcomes: ReadonlyArray<ToolOutcome>): Result.Result<Frame, s
   return size ? Result.succeed(size) : Result.fail("probe reported no frame size")
 }
 
-const motionEnergy = (outcomes: ReadonlyArray<ToolOutcome>): Result.Result<Series, string> => {
-  const energy = outputs(ScanOutput, outcomes)[0]?.motion.energy
-  return energy ? Result.succeed(energy) : Result.fail("scan reported no per-frame energy")
+/** When the box starts or settles, as track's change summary reports it. */
+const changeAt = (
+  outcomes: ReadonlyArray<ToolOutcome>,
+  clock: Clock,
+  which: "starts" | "settles"
+): Result.Result<string, string> => {
+  const change = outputs(TrackOutput, outcomes)[0]?.change
+  if (change === undefined) return Result.fail("track reported no change for the box")
+  const at = change[which]
+  if (at === null)
+    return Result.fail(
+      which === "starts" ? "nothing in the box visibly changes" : "the box still changes at the last frame"
+    )
+  return frame(resolveOn(clock, at)[0], `track's ${which} address ${at} does not resolve`)
 }
 
 const frame = (i: number | undefined, why: string): Result.Result<string, string> =>
@@ -87,7 +95,6 @@ export const uiPlan = (givens: UiGivens, ctx: { readonly req: Requester; readonl
       ...(fitEasing ? { fitEasing: true } : {})
     })
   const xywh = ["x", "y", "w", "h"]
-  const energyScan = req("kymo_scan", { budget: 4, sample: "even", format: "detailed" })
   const check = (rules: ReadonlyArray<string>, extra: Record<string, unknown> = {}) =>
     req("kymo_check", { rules, ...extra })
 
@@ -95,8 +102,8 @@ export const uiPlan = (givens: UiGivens, ctx: { readonly req: Requester; readonl
     case "ui-start":
     case "ui-settle": {
       const first = givens._tag === "ui-start"
-      // Visible at 0f: follow it. Entering from nothing: there is no box to follow from 0f, so read
-      // the whole frame's motion energy, which is all kymo offers without a box.
+      // Visible at 0f: follow it. Entering from nothing: there is no box to follow from 0f, so
+      // measure change inside the box where it comes to rest, as the skill's recipe says.
       if (givens.subject.seen === "first-frame")
         return {
           requests: [probe, track(givens.subject.box, xywh)],
@@ -112,15 +119,11 @@ export const uiPlan = (givens: UiGivens, ctx: { readonly req: Requester; readonl
             )
         }
       return {
-        requests: [probe, energyScan],
-        conclude: (o) =>
-          Result.flatMap(motionEnergy(o), (energy) => {
-            const moving = energy.flatMap((e, i) => (e !== null && e > STILL_FLOOR ? [i] : []))
-            return frame(
-              first ? moving[0] : moving[moving.length - 1],
-              "scan saw no motion above the stillness floor"
-            )
-          })
+        requests: [
+          probe,
+          req("kymo_track", { box: givens.subject.box, range: "0f..-1f", props: ["change"] })
+        ],
+        conclude: (o) => changeAt(o, clock, first ? "starts" : "settles")
       }
     }
     case "ui-easing":
