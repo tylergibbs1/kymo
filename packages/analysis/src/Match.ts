@@ -5,6 +5,7 @@
  * matches on what is left of it.
  */
 import type { Plane } from "./Plane.ts"
+import { robustLine } from "./RobustFit.ts"
 
 /** A template sampled at one pyramid level, with each pixel's offset from the template centre. */
 export interface Template {
@@ -148,6 +149,66 @@ export const score = (plane: Plane, t: Template, pose: Pose): Score => {
   if (vp < 1e-6) return { q: 0, visible, contrast, gain }
   const q = covariance / Math.sqrt(vt * vp)
   return { q: Math.max(0, Math.min(1, q)), visible, contrast, gain }
+}
+
+/** The subject's opacity relative to its template, and how sure that is. */
+export interface Fade {
+  /** The slope of frame on template that the pixels agree on: 1 as at the anchor, 0 gone. */
+  readonly opacity: number
+  /** One standard error of `opacity`. */
+  readonly noise: number
+  /** Share of the template's pixels that fit that slope, 0..1: low when something covers the subject. */
+  readonly fitting: number
+}
+
+/**
+ * How much of the template's own contrast the frame shows at `pose`, as `gain` in `score` measures it
+ * but fitted robustly (`frame ≈ opacity · template + offset`): pixels something else covers, such as
+ * a translucent band passing over, or an edge off by a fraction of a pixel, fit badly and are left
+ * out, so they neither dim nor brighten the subject. Only template pixels `inset` or more from its
+ * edge are used. Undefined when those pixels have no structure.
+ */
+export const fadeAt = (
+  plane: Plane,
+  t: Template,
+  pose: Pose,
+  noise: number,
+  inset: number
+): Fade | undefined => {
+  const at = sampler(plane)
+  const [a0, a1] = visibleSpan(t.ox, pose.cx, pose.s, plane.width)
+  const [b0, b1] = visibleSpan(t.oy, pose.cy, pose.s, plane.height)
+  const [i0, i1] = [Math.max(a0, inset), Math.min(a1, t.w - 1 - inset)]
+  const [j0, j1] = [Math.max(b0, inset), Math.min(b1, t.h - 1 - inset)]
+  const n = Math.max(0, i1 - i0 + 1) * Math.max(0, j1 - j0 + 1)
+  const xs = new Float32Array(n)
+  const ys = new Float32Array(n)
+  let k = 0
+  let sum = 0
+  let sq = 0
+  for (let j = j0; j <= j1; j++)
+    for (let i = i0; i <= i1; i++) {
+      const v = t.data[j * t.w + i]!
+      sum += v
+      sq += v * v
+      xs[k] = v
+      ys[k++] = at(pose.cx + pose.s * t.ox[i]!, pose.cy + pose.s * t.oy[j]!)
+    }
+  if (n === 0 || sq / n - (sum / n) ** 2 < FLAT) return undefined
+  const line = robustLine(xs, ys, n, noise, true)
+  if (line === undefined) return undefined
+  // Fit again starting from "unchanged since the anchor". In a fade every pixel of the subject moves
+  // along one line, and both fits find it. When part of the subject is seen through something else
+  // (a translucent band passing over it), or the first fit is bent by a moving subject's edges, the
+  // pixels that are unchanged agree on a line of their own. A translucent layer only takes contrast
+  // away, so of two lines that differ, the one showing more of the subject's contrast is its own.
+  const unchanged = robustLine(xs, ys, n, noise, true, { slope: 1, offset: 0 })
+  const best =
+    unchanged !== undefined &&
+    unchanged.slope - line.slope > 3 * Math.hypot(unchanged.slopeNoise, line.slopeNoise)
+      ? unchanged
+      : line
+  return { opacity: best.slope, noise: best.slopeNoise, fitting: best.fitting }
 }
 
 export interface SearchWindow {

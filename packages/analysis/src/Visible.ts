@@ -8,7 +8,8 @@
  */
 import { CHANGED_FRACTION } from "./Difference.ts"
 import type { DiffLevels } from "./Pixels.ts"
-import { MIN_MOVING_PIXELS } from "./Signals.ts"
+import { robustLine } from "./RobustFit.ts"
+import { MIN_MOVING_PIXELS, noiseLevelOf } from "./Signals.ts"
 
 /**
  * Below 2% of full scale (5 of 255 luma steps) a change between two frames is not visible on screen
@@ -21,6 +22,14 @@ const SUBPIXEL = 0.5
 
 /** The `edge` of a rule read at `scale` working pixels per source pixel: half a source pixel. */
 export const subpixelEdge = (scale: number): number => SUBPIXEL * scale
+
+/**
+ * The luma steps a pixel must change by to count, from frame pairs that show the clip's encoder noise
+ * (consecutive frames): that noise, and never less than `VISIBLE_STEP`. Every per-pixel change rule
+ * takes its floor from here.
+ */
+export const visibleFloor = (pairs: ReadonlyArray<DiffLevels>): number =>
+  Math.max(VISIBLE_STEP, noiseLevelOf(pairs))
 
 /** The ring explains the box only when more than this share of it changed, and fits one overlay this well. */
 const RING_SHARE = 0.5
@@ -168,6 +177,157 @@ const ringOverlay = (
       if (Math.abs(cur.data[k]! - r - alpha * (target - r)) <= floor) fits++
     }
   return fits >= RING_SHARE * n ? { alpha, target } : undefined
+}
+
+/**
+ * The way the box's look changes over a range, last frame minus first, on the pixels it changes by
+ * more than the floor: a fade or cross-fade moves every pixel along it in proportion.
+ */
+export interface Direction {
+  /** Per patch pixel, last − first; 0 outside the box and where the change is under the floor. */
+  readonly data: Float32Array
+}
+
+/** The box's change from `first` to `last`, or undefined when too few of its pixels change to say. */
+export const directionOf = (
+  first: Patch,
+  last: Patch,
+  inner: Inner,
+  floor: number
+): Direction | undefined => {
+  const data = new Float32Array(first.width * first.height)
+  let pixels = 0
+  for (let y = inner.y0; y < inner.y1; y++)
+    for (let x = inner.x0; x < inner.x1; x++) {
+      const k = y * first.width + x
+      const d = last.data[k]! - first.data[k]!
+      if (Math.abs(d) <= floor) continue
+      data[k] = d
+      pixels++
+    }
+  const total = (inner.x1 - inner.x0) * (inner.y1 - inner.y0)
+  return isVisible({ changed: pixels, total, sum: 0, discounted: false }) ? { data } : undefined
+}
+
+/** How a frame's box differs from a reference frame's, split into a fade and what a fade does not explain. */
+export interface Difference {
+  /**
+   * How far along the box's `Direction` the frame is from the reference: the fraction of the whole
+   * fade or cross-fade between them (0 without a direction). For an element fading in place over a
+   * plain page it is the change in its opacity.
+   */
+  readonly fade: number
+  /** One standard error of `fade`. */
+  readonly fadeNoise: number
+  /** Box pixels that changed beyond the fade, the floor, and what an edge moving under `rule.edge` does. */
+  readonly moved: Visible
+}
+
+/**
+ * How `cur` differs from `ref` inside the box: the fade along `direction` that the box's pixels agree
+ * on (a robust fit, so pixels that moved do not bend it), and the pixels the fade does not explain.
+ * A dim or brighten of the whole ring (a scrim) is taken out first, as in `visibleChange`.
+ */
+export const difference = (
+  ref: Patch,
+  cur: Patch,
+  inner: Inner,
+  rule: Rule,
+  direction: Direction | undefined,
+  radius: number
+): Difference => {
+  const overlay = ringOverlay(ref, cur, inner, rule.floor)
+  const w = ref.width
+  const limitAt = (x: number, y: number) =>
+    Math.max(rule.floor, rule.edge * Math.max(edgeAt(ref, x, y), edgeAt(cur, x, y)))
+  const explained = (k: number, d: number, limit: number) =>
+    overlay !== undefined && Math.abs(d - overlay.alpha * (overlay.target - ref.data[k]!)) <= limit
+  let fade = 0
+  let fadeNoise = 0
+  if (direction !== undefined) {
+    const xs: Array<number> = []
+    const ys: Array<number> = []
+    for (let y = inner.y0; y < inner.y1; y++)
+      for (let x = inner.x0; x < inner.x1; x++) {
+        const k = y * w + x
+        const dir = direction.data[k]!
+        if (dir === 0) continue
+        const d = cur.data[k]! - ref.data[k]!
+        if (explained(k, d, limitAt(x, y))) continue
+        xs.push(dir)
+        ys.push(d)
+      }
+    // Encoder noise is about half the floor (the floor is where noise stops); a fit closer than that is luck.
+    const line = robustLine(xs, ys, xs.length, rule.floor / 2, false)
+    if (line !== undefined) {
+      fade = line.slope
+      fadeNoise = line.slopeNoise
+    }
+  }
+  const near = nearby(radius)
+  let changed = 0
+  let sum = 0
+  for (let y = inner.y0; y < inner.y1; y++)
+    for (let x = inner.x0; x < inner.x1; x++) {
+      const k = y * w + x
+      const d = cur.data[k]! - ref.data[k]!
+      const rest = d - fade * (direction?.data[k] ?? 0)
+      const limit = limitAt(x, y)
+      if (Math.abs(rest) <= limit || explained(k, d, limit)) continue
+      // Moved by less than `rule.edge`: the reference shows this value somewhere that close.
+      const v = ref.data[k]! + rest
+      let lo = Infinity
+      let hi = -Infinity
+      for (const [ox, oy] of near) {
+        const s = bilinear(ref, x + ox, y + oy)
+        if (s < lo) lo = s
+        if (s > hi) hi = s
+      }
+      if (v >= lo - rule.floor && v <= hi + rule.floor) continue
+      changed++
+      sum += Math.abs(rest)
+    }
+  return {
+    fade,
+    fadeNoise,
+    moved: {
+      changed,
+      total: (inner.x1 - inner.x0) * (inner.y1 - inner.y0),
+      sum,
+      discounted: overlay !== undefined
+    }
+  }
+}
+
+/**
+ * Offsets (working pixels) closer than `radius` to a pixel, a quarter pixel apart or finer: where an
+ * edge moving less than `radius` could have come from. Values between two of them are reached too,
+ * as the picture is continuous between its samples.
+ */
+const nearby = (radius: number): ReadonlyArray<readonly [number, number]> => {
+  const step = Math.min(0.25, radius / 2)
+  const reach = Math.ceil(radius / step)
+  const out: Array<readonly [number, number]> = []
+  for (let j = -reach; j <= reach; j++)
+    for (let i = -reach; i <= reach; i++)
+      if (Math.hypot(i * step, j * step) < radius) out.push([i * step, j * step])
+  return out.length > 0 ? out : [[0, 0]]
+}
+
+/** `p` at a fractional pixel position, clamped to its edges. */
+const bilinear = (p: Patch, x: number, y: number): number => {
+  const u = Math.max(0, Math.min(p.width - 1, x))
+  const v = Math.max(0, Math.min(p.height - 1, y))
+  const x0 = Math.floor(u)
+  const y0 = Math.floor(v)
+  const x1 = Math.min(x0 + 1, p.width - 1)
+  const y1 = Math.min(y0 + 1, p.height - 1)
+  const fx = u - x0
+  const fy = v - y0
+  const d = p.data
+  const top = d[y0 * p.width + x0]! + fx * (d[y0 * p.width + x1]! - d[y0 * p.width + x0]!)
+  const bot = d[y1 * p.width + x0]! + fx * (d[y1 * p.width + x1]! - d[y1 * p.width + x0]!)
+  return top + fy * (bot - top)
 }
 
 /** Which of the box's pixels changed visibly from `ref` to `cur`, two patches cut the same way. */

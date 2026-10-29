@@ -9,7 +9,17 @@ export {
   frameDifferences,
   isChanged
 } from "./Difference.ts"
-export { type BoxChange, type FrameChange, type Span, boxChange, pairChanges } from "./Change.ts"
+export {
+  type BoxChange,
+  Changes,
+  DEFAULT_WITHIN,
+  type FrameChange,
+  type Span,
+  type Timing,
+  Within,
+  boxChange,
+  pairChanges
+} from "./Change.ts"
 export { referenceChanges } from "./Reference.ts"
 export { VISIBLE_STEP } from "./Visible.ts"
 export { MOTION_TRACK, Motion, MotionPeak, MotionWindow, motionEnergy } from "./Motion.ts"

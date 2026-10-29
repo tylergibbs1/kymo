@@ -107,7 +107,9 @@ describe("change inside a box", () => {
           format: "detailed"
         })
         const change = out.change!
-        // On screen in the box from frame 16 (x 614); within half a pixel of x=500 from frame 28.
+        // On screen in the box from frame 16 (x 614); within a pixel of x=500 from frame 27.
+        expect(change.state).toBe("changes")
+        expect(change.within).toEqual({ px: 1, opacity: 0.02 })
         expect(change.starts).not.toBeNull()
         const starts = out.tracks[0]!.samples!.find((s) => s.address === change.starts)!.index
         const settles = out.tracks[0]!.samples!.find((s) => s.address === change.settles)!.index
@@ -119,6 +121,19 @@ describe("change inside a box", () => {
         expect(change.discounted.length).toBeGreaterThan(0)
         expect(change.floor).toBeGreaterThanOrEqual(5)
       }).pipe(Effect.provide(fresh))
+  )
+
+  it.effect("refuses a within rule on a call that measures no change", () =>
+    Effect.gen(function* () {
+      const e = yield* failure(track, {
+        source: clips["toast23"],
+        box: TOAST_BOX,
+        props: ["x"],
+        withinPx: 2
+      })
+      expect(e._tag).toBe("InvalidInput")
+      expect((e as { hint: string }).hint).toContain('props=["change"]')
+    }).pipe(Effect.provide(fresh))
   )
 
   it.effect("asks for a box when change or whole-frame motion is asked of a source's own tracks", () =>

@@ -4,6 +4,7 @@ import {
   type BoxChange,
   type FrameRange,
   type RegionTrack,
+  type Within,
   boxChange,
   parseBox,
   trackRegion
@@ -44,10 +45,13 @@ export const measureBox = (
 ): Effect.Effect<RegionTrack, KymoError> =>
   Effect.flatMap(boxOn(source, box), (b) => trackRegion(source, range, b, { anchor }))
 
-/** Visible change inside `box`, a fixed place on screen, through the range. */
+/** Visible change inside `box`, a fixed place on screen, through the range; `within` times it. */
 export const measureChange = (
   source: Source,
   range: FrameRange,
-  box: string
+  box: string,
+  within?: Within
 ): Effect.Effect<BoxChange, KymoError> =>
-  Effect.flatMap(boxOn(source, box), (b) => boxChange(source, range, b))
+  Effect.flatMap(boxOn(source, box), (b) =>
+    boxChange(source, range, b, within === undefined ? {} : { within })
+  )

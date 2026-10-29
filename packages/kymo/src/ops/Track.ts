@@ -1,5 +1,6 @@
 import {
   type BoxChange,
+  DEFAULT_WITHIN,
   EasingFit,
   FrameRange,
   LostReason,
@@ -9,7 +10,8 @@ import {
   fitEasing,
   keyframeIndices,
   knownSamples,
-  unitScale
+  unitScale,
+  Within
 } from "@kymo/analysis"
 import {
   Address,
@@ -48,6 +50,18 @@ const fields = {
     Schema.String.check(Schema.isMinLength(1)).annotate({
       description:
         "With box: the frame the box describes, e.g. 30f; tracking runs forwards and backwards from it. Default: the first address of range as written. Read the box off the frame where the subject is fully visible."
+    })
+  ),
+  withinPx: Schema.optionalKey(
+    Within.fields.px.annotate({
+      description:
+        "With props change: an edge moving less than this many source pixels still looks the same, for starts and settles. Default 1."
+    })
+  ),
+  withinOpacity: Schema.optionalKey(
+    Within.fields.opacity.annotate({
+      description:
+        "With props change: a fade of less than this (0..1) still looks the same, for starts and settles. Default 0.02 (2%)."
     })
   ),
   plot: Schema.Boolean.annotate({ description: "Also draw the tracks as a chart image." }).pipe(
@@ -91,32 +105,59 @@ const Run = Schema.Struct({
   frames: Schema.Int.annotate({ description: "How many frames that is." })
 })
 
-export const ChangeSummary = Schema.Struct({
+const changeFields = {
   box: Schema.String.annotate({
     description:
       "The region measured, x,y,w,h in source pixels: the box as given, fixed on screen (it does not follow the subject)."
   }),
   floor: Schema.Number.annotate({
     description:
-      "Luma steps (0..255) a pixel had to change by to count: 5 (2% of full scale), or this clip's own noise inside the box when that is larger. An edge also had to move by half a pixel or more."
+      "Luma steps (0..255) a pixel had to change by to count: 5 (2% of full scale), or this clip's own noise inside the box when that is larger."
   }),
-  starts: Schema.NullOr(Schema.String).annotate({
-    description: "The first frame that visibly differs from the range's first frame; null if none does."
-  }),
-  settles: Schema.NullOr(Schema.String).annotate({
+  within: Schema.Struct({
+    px: Schema.Number.annotate({ description: "Source pixels an edge may move and still look the same." }),
+    opacity: Schema.Number.annotate({
+      description:
+        "How far the box may fade (0..1 of its whole change over the range) and still look the same."
+    })
+  }).annotate({
     description:
-      "The first frame from which every frame looks like the range's last frame: where the box reaches its final look. null when the last frame still differs from the one before it (still changing at the end of the range)."
+      "What starts and settles count as looking the same: an edge moving less than px, and a fade less than opacity (set with withinPx and withinOpacity)."
   }),
   changing: Schema.Array(Run).annotate({
     description:
-      "Runs of frames that visibly differ from the frame before them, in order. The value at frame N compares N with N-1, so a run's last frame is where that change finished."
+      "Runs of frames that visibly differ from the frame before them (beyond the floor, an edge moving half a pixel or more), in order. The value at frame N compares N with N-1, so a run's last frame is where that change finished. A slow fade can change the box a lot without any run."
   }),
   discounted: Schema.Array(Run).annotate({
     description:
       "Runs of frames where the page around the box dimmed or brightened as a whole (a scrim, a backdrop): that tone change was taken out of the box's change. Empty when the surroundings stayed put."
   })
-}).annotate({
-  description: "With props change: when the box visibly changes, measured against the clip's noise."
+}
+
+export const ChangeSummary = Schema.Union([
+  Schema.Struct({
+    state: Schema.Literal("still").annotate({
+      description: "No frame differs from the range's first frame by more than within."
+    }),
+    starts: Schema.Null,
+    settles: Schema.Null,
+    ...changeFields
+  }),
+  Schema.Struct({
+    state: Schema.Literal("changes").annotate({ description: "The box changes: see starts and settles." }),
+    starts: Schema.String.annotate({
+      description:
+        "The first frame that differs from the range's first frame by more than within: an edge moving within.px or more, or a fade of within.opacity or more."
+    }),
+    settles: Schema.NullOr(Schema.String).annotate({
+      description:
+        "The first frame, never before starts, from which no frame differs from the range's last frame by more than within: where the box reaches its final look. null when only the last frame looks like the last frame (still changing at the end of the range: widen it)."
+    }),
+    ...changeFields
+  })
+]).annotate({
+  description:
+    "With props change: when the box changes, by the within rule (default 1 px or 2% opacity) against the range's first and last frames."
 })
 type ChangeSummary = typeof ChangeSummary.Type
 
@@ -279,6 +320,12 @@ const framesOf = (input: TrackInput, timeline: Source["timeline"]): Effect.Effec
 const measure = (input: TrackInput, source: Source, frames: Frames): Effect.Effect<Measured, KymoError> =>
   Effect.gen(function* () {
     const { timeline } = source
+    const asksChange = "box" in input && (input.props ?? []).some((p) => p.replace(/^box\./, "") === "change")
+    if (!asksChange && (input.withinPx !== undefined || input.withinOpacity !== undefined))
+      return yield* invalid(
+        "withinPx and withinOpacity time when a box's change starts and settles; this call measures no change.",
+        'Pass box=x,y,w,h with props=["change"], or drop withinPx and withinOpacity.'
+      )
     if ("select" in input)
       return yield* invalid(
         `select follows DOM elements on web sources; ${timeline.handle} is a ${timeline.kind} source.`,
@@ -297,12 +344,24 @@ const measure = (input: TrackInput, source: Source, frames: Frames): Effect.Effe
       const region = wanted.some((p) => p !== "change")
         ? yield* measureBox(source, frames.range, input.box, frames.anchor)
         : undefined
+      const within = {
+        px: input.withinPx ?? DEFAULT_WITHIN.px,
+        opacity: input.withinOpacity ?? DEFAULT_WITHIN.opacity
+      }
       const change = wanted.includes("change")
-        ? yield* measureChange(source, frames.range, input.box)
+        ? yield* measureChange(source, frames.range, input.box, within)
         : undefined
       const picked = wanted.flatMap((p): Array<{ readonly track: Track; readonly role: Role }> => {
         if (p === "change") return change === undefined ? [] : [{ track: change.track, role: "change" }]
         if (region === undefined) return []
+        // An opacity comes with its own noise, so a dip can be told from a measurement that is unsure.
+        if (p === "opacity")
+          return [
+            { track: region.opacity, role: "value" },
+            ...(region.opacityNoise === undefined
+              ? []
+              : [{ track: region.opacityNoise, role: "confidence" as const }])
+          ]
         return [{ track: region[p], role: p === "confidence" ? "confidence" : "value" }]
       })
       return {
@@ -333,14 +392,17 @@ const changeSummary = (c: BoxChange, range: FrameRange): ChangeSummary => {
       range: range.spanText(s.from.index, s.to.index),
       frames: s.to.index - s.from.index + 1
     }))
-  return {
+  const common = {
     box: [c.box.x, c.box.y, c.box.w, c.box.h].join(","),
     floor: c.floor,
-    starts: c.starts?.address ?? null,
-    settles: c.settles?.address ?? null,
+    within: c.within,
     changing: runs(c.changing),
     discounted: runs(c.discounted)
   }
+  const t = c.timing
+  return t._tag === "still"
+    ? { state: "still", starts: null, settles: null, ...common }
+    : { state: "changes", starts: t.starts.address, settles: t.settles?.address ?? null, ...common }
 }
 
 /** What to tell the caller about a lost box: a wrong box at the anchor, or the subject leaving or fading. */
@@ -441,7 +503,7 @@ export const track = define({
     const span = range.spanText(range.first, range.last)
     const notes = [
       ...(measured.region === undefined ? [] : lostNotes(input, measured.region, frames, timeline.handle)),
-      ...(measured.change !== undefined && measured.change.settles === undefined
+      ...(measured.change?.timing._tag === "changes" && measured.change.timing.settles === null
         ? [
             `The box still changes at the last frame, so it has not settled in ${span}; widen the range to see where it settles.`
           ]

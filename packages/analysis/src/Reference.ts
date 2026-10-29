@@ -6,12 +6,9 @@
  */
 import { type FrameIndex, InvalidInput, type KymoError, type Source, frameIndex } from "@kymo/core"
 import { Effect, Stream } from "effect"
-import { type Cut, type FrameChange, cutPatch, workEdge } from "./Change.ts"
+import { type Cut, type FrameChange, cutBox, frameChange, ruleOf, workEdge } from "./Change.ts"
 import { toGray } from "./Pixels.ts"
-import { noiseLevelOf } from "./Signals.ts"
-import { round } from "./Stats.ts"
 import type { Box } from "./Tracker.ts"
-import { type Rule, VISIBLE_STEP, isVisible, patchLevels, subpixelEdge, visibleChange } from "./Visible.ts"
 
 /**
  * Each of `indices` against frame `against`, inside `box` (source pixels). Reads every frame, the
@@ -38,34 +35,17 @@ export const referenceChanges = (
     let scale = 1
     yield* Stream.runForEach(source.readFrames(wanted, { maxEdge: workEdge(size, box) }), (frame) =>
       Effect.sync(() => {
-        const gray = toGray(frame.image)
-        const sx = gray.width / size.width
-        const sy = gray.height / size.height
-        scale = Math.min(sx, sy)
-        cuts.set(frame.index, cutPatch(gray, { x: box.x * sx, y: box.y * sy, w: box.w * sx, h: box.h * sy }))
+        const c = cutBox(toGray(frame.image), size, box)
+        scale = c.scale
+        cuts.set(frame.index, c)
       })
     )
     const consecutive = indices.flatMap((i) => {
       const [a, b] = [cuts.get(i - 1), cuts.get(i)]
-      if (a === undefined || b === undefined) return []
-      const { box: inBox, ring } = patchLevels(a.patch, b.patch, b.inner)
-      return ring === undefined ? [inBox] : [inBox, ring]
+      return a === undefined || b === undefined ? [] : [[a, b] as const]
     })
-    const rule: Rule = {
-      floor: Math.max(VISIBLE_STEP, noiseLevelOf(consecutive)),
-      edge: subpixelEdge(scale)
-    }
+    const rule = ruleOf(consecutive, scale)
     const ref = cuts.get(against)!
-    const frames = indices.map((index): FrameChange => {
-      const cur = cuts.get(index)!
-      const v = visibleChange(ref.patch, cur.patch, cur.inner, rule)
-      return {
-        index,
-        changedFraction: round(v.changed / v.total, 4),
-        changedMean: v.changed === 0 ? 0 : round(v.sum / v.changed / 255, 4),
-        visible: isVisible(v),
-        discounted: v.discounted
-      }
-    })
+    const frames = indices.map((index) => frameChange(index, ref, cuts.get(index)!, rule))
     return { floor: rule.floor, frames }
   })

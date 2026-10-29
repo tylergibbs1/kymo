@@ -142,6 +142,61 @@ describe("tracking a subject at rest", () => {
   )
 })
 
+describe("opacity of a subject that does not fade", () => {
+  // A card (one layer: a white panel with a dark mark and a line) on a page with text-like lines.
+  const card = (x: number, y: number) => [
+    { x, y, w: 60, h: 40, rgb: [255, 255, 255] as const },
+    { x: x + 6, y: y + 6, w: 10, h: 10, rgb: [120, 60, 200] as const },
+    { x: x + 22, y: y + 9, w: 30, h: 4, rgb: [30, 30, 40] as const },
+    { x: x + 6, y: y + 26, w: 44, h: 3, rgb: [150, 150, 160] as const }
+  ]
+  const page = [
+    { x: 4, y: 8, w: 150, h: 3, rgb: [200, 205, 215] as const },
+    { x: 4, y: 100, w: 120, h: 3, rgb: [200, 205, 215] as const }
+  ]
+  const size = { width: 160, height: 120 }
+  const opacityMisses = (region: RegionTrack, tolerance: number) =>
+    region.opacity.samples.flatMap((v, i) => (v === null || Math.abs(v - 1) > tolerance ? [[i, v]] : []))
+
+  it.effect("reads 1 every frame while it slides by fractions of a pixel, with its noise", () =>
+    Effect.gen(function* () {
+      const x = (i: number) => 20 + 2.7 * i
+      const sliding = fakeSource({
+        frames: 30,
+        size,
+        scene: (i) => ({ background: [238, 241, 245], rects: [...page, ...card(x(i), 40.4)] })
+      })
+      const range = yield* FrameRange.whole(sliding.timeline)
+      const region = yield* trackRegion(sliding, range, { x: 20, y: 40.4, w: 60, h: 40 })
+      expect(opacityMisses(region, 0.02)).toEqual([])
+      const noise = region.opacityNoise!.samples
+      expect(noise.every((n) => n !== null && n >= 0 && n < 0.02)).toBe(true)
+    })
+  )
+
+  it.effect("reads 1 while a translucent band passes over part of it", () =>
+    Effect.gen(function* () {
+      // An orange band at 40% opacity, 16 px tall, sweeping down over the resting card.
+      const band = (i: number) => ({
+        x: 0,
+        y: 20 + 2 * i,
+        w: 160,
+        h: 16,
+        rgb: [240, 160, 60] as const,
+        alpha: 0.4
+      })
+      const covered = fakeSource({
+        frames: 30,
+        size,
+        scene: (i) => ({ background: [238, 241, 245], rects: [...page, ...card(50, 40), band(i)] })
+      })
+      const range = yield* FrameRange.whole(covered.timeline)
+      const region = yield* trackRegion(covered, range, { x: 50, y: 40, w: 60, h: 40 })
+      expect(opacityMisses(region, 0.05)).toEqual([])
+    })
+  )
+})
+
 describe("tracking cost", () => {
   it.effect("decodes a large box small, so cost does not grow with it", () =>
     Effect.gen(function* () {

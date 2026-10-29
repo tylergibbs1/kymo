@@ -2,8 +2,8 @@ import { Address } from "@kymo/core"
 import { BLACK, type PixelInput, runs } from "./FrameTiming.ts"
 import { type Finding, finding } from "./Finding.ts"
 import { levelsAbove } from "./Pixels.ts"
-import { noiseLevelOf } from "./Signals.ts"
-import { VISIBLE_STEP } from "./Visible.ts"
+
+import { visibleFloor } from "./Visible.ts"
 
 export { type PixelInput, droppedFrames, duplicateFrames } from "./FrameTiming.ts"
 
@@ -20,7 +20,7 @@ export const flicker = ({ scan }: PixelInput): Array<Finding> => {
   const { range } = scan
   const l = scan.frames.map((f) => f.luma)
   const levels = scan.frames.flatMap((f) => (f.levels === null ? [] : [f.levels]))
-  const floor = Math.max(VISIBLE_STEP, noiseLevelOf(levels))
+  const floor = visibleFloor(levels)
   const changed = (k: number) => {
     const lv = scan.frames[k]?.levels
     return lv == null ? 0 : levelsAbove(lv, floor)

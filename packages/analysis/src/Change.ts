@@ -5,7 +5,7 @@
  */
 import {
   type FrameIndex,
-  type FrameRef,
+  FrameRef,
   InvalidInput,
   type KymoError,
   type Size,
@@ -13,17 +13,18 @@ import {
   type Track,
   frameIndex
 } from "@kymo/core"
-import { Effect, Stream } from "effect"
+import { Effect, Schema, Stream } from "effect"
 import { type Gray, toGray } from "./Pixels.ts"
 import type { FrameRange } from "./Range.ts"
-import { noiseLevelOf } from "./Signals.ts"
 import { round } from "./Stats.ts"
 import type { Box } from "./Tracker.ts"
 import {
   type Inner,
   type Patch,
   type Rule,
-  VISIBLE_STEP,
+  visibleFloor,
+  difference,
+  directionOf,
   patchLevels,
   isVisible,
   subpixelEdge,
@@ -89,7 +90,7 @@ export const cutPatch = (
 }
 
 /** A cut of `box` (source pixels) from a frame decoded at any size, and that size's scale. */
-const cutBox = (gray: Gray, size: Size, box: Box): Cut & { readonly scale: number } => {
+export const cutBox = (gray: Gray, size: Size, box: Box): Cut & { readonly scale: number } => {
   const sx = gray.width / size.width
   const sy = gray.height / size.height
   return {
@@ -122,7 +123,7 @@ export interface FrameChange {
   readonly discounted: boolean
 }
 
-const frameChange = (index: FrameIndex, ref: Cut, cur: Cut, rule: Rule): FrameChange => {
+export const frameChange = (index: FrameIndex, ref: Cut, cur: Cut, rule: Rule): FrameChange => {
   const v = visibleChange(ref.patch, cur.patch, cur.inner, rule)
   return {
     index,
@@ -133,16 +134,17 @@ const frameChange = (index: FrameIndex, ref: Cut, cur: Cut, rule: Rule): FrameCh
   }
 }
 
-/** The rule for a set of consecutive pairs: their own noise, never below what is visible. */
-const ruleOf = (pairs: ReadonlyArray<readonly [Cut, Cut]>, scale: number): Rule => ({
-  floor: Math.max(
-    VISIBLE_STEP,
-    noiseLevelOf(
-      pairs.flatMap(([a, b]) => {
-        const { box, ring } = patchLevels(a.patch, b.patch, b.inner)
-        return ring === undefined ? [box] : [box, ring]
-      })
-    )
+/**
+ * The rule for a set of consecutive pairs: their own noise, never below what is visible. The one
+ * noise floor for change in a box, whatever the frames are compared against: consecutive frames show
+ * the clip's encoder noise.
+ */
+export const ruleOf = (pairs: ReadonlyArray<readonly [Cut, Cut]>, scale: number): Rule => ({
+  floor: visibleFloor(
+    pairs.flatMap(([a, b]) => {
+      const { box, ring } = patchLevels(a.patch, b.patch, b.inner)
+      return ring === undefined ? [box] : [box, ring]
+    })
   ),
   edge: subpixelEdge(scale)
 })
@@ -153,10 +155,45 @@ export interface Span {
   readonly to: FrameRef
 }
 
+/**
+ * How far a frame may be from another and still look the same, for when the box starts and settles:
+ * an edge moving by less than `px` source pixels, and a fade by less than `opacity`.
+ */
+export const Within = Schema.Struct({
+  px: Schema.Finite.check(Schema.isGreaterThan(0)),
+  opacity: Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 1, exclusiveMinimum: true }))
+})
+export type Within = typeof Within.Type
+
+/** One pixel of movement or 2% of opacity: the least change a viewer is asked to see. */
+export const DEFAULT_WITHIN: Within = { px: 1, opacity: 0.02 }
+
+/**
+ * When the box changes: `still` when no frame differs from the first, else from `starts` to
+ * `settles` (null while it is still changing at the last frame). A `changes` is only made through
+ * `Changes.make`, which refuses a `settles` before its `starts`.
+ */
+export const Changes = Schema.TaggedStruct("changes", {
+  starts: FrameRef,
+  settles: Schema.NullOr(FrameRef)
+})
+  .check(
+    Schema.makeFilter((c) =>
+      c.settles === null || c.settles.index >= c.starts.index
+        ? undefined
+        : `settles at ${c.settles.address}, before it starts at ${c.starts.address}`
+    )
+  )
+  .pipe(Schema.brand("Changes"))
+export type Changes = typeof Changes.Type
+export type Timing = { readonly _tag: "still" } | Changes
+
 export interface BoxChange {
   readonly box: Box
   /** Luma steps (0..255) a pixel had to change by to count. */
   readonly floor: number
+  /** What `timing` counts as looking the same. */
+  readonly within: Within
   /** Every frame of the range that has a frame before it, in order. */
   readonly frames: ReadonlyArray<FrameChange>
   /** `<name>.change`: each frame's `changedFraction`, null where there is no frame before it or outside the range. */
@@ -165,13 +202,12 @@ export interface BoxChange {
   readonly changing: ReadonlyArray<Span>
   /** Runs of frames where a dim or brighten of the page around the box was taken out of its change. */
   readonly discounted: ReadonlyArray<Span>
-  /** The first frame that visibly differs from the range's first frame. */
-  readonly starts: FrameRef | undefined
   /**
-   * The first frame from which every frame looks like the range's last one: where the box reaches
-   * its final look. Undefined when the last frame still visibly differs from the one before it.
+   * `starts`: the first frame that differs from the range's first frame by more than `within`.
+   * `settles`: the first frame, not before `starts`, from which no frame differs from the range's
+   * last frame by more than `within`.
    */
-  readonly settles: FrameRef | undefined
+  readonly timing: Timing
 }
 
 /** Runs of consecutive frames that satisfy `test`. */
@@ -191,6 +227,39 @@ const runs = (
 }
 
 /**
+ * When the box starts and settles: against the first frame and against the last, each frame differs
+ * when the fade between them (along the box's whole change) reaches `within.opacity`, or when pixels
+ * the fade does not explain changed beyond the floor and an edge moving `within.px`.
+ */
+const timingOf = (
+  range: FrameRange,
+  cuts: ReadonlyArray<{ readonly index: FrameIndex; readonly cut: Cut }>,
+  rule: Rule,
+  /** Working pixels an edge may move and still look the same: `within.px` at the working scale. */
+  radius: number,
+  within: Within
+): Timing => {
+  const first = cuts[0]!.cut
+  const last = cuts[cuts.length - 1]!.cut
+  const direction = directionOf(first.patch, last.patch, first.inner, rule.floor)
+  const differs = (ref: Cut, cur: Cut) => {
+    const d = difference(ref.patch, cur.patch, cur.inner, rule, direction, radius)
+    return isVisible(d.moved) || Math.abs(d.fade) >= within.opacity
+  }
+  const startAt = cuts.findIndex((c) => differs(first, c.cut))
+  if (startAt < 0) return { _tag: "still" }
+  let settleAt = cuts.length - 1
+  while (settleAt > startAt && !differs(last, cuts[settleAt - 1]!.cut)) settleAt--
+  // Settling at the last frame is not seen to hold: it may go on changing after the range.
+  const settled = settleAt < cuts.length - 1 || cuts.length === 1
+  return Changes.make({
+    _tag: "changes",
+    starts: range.ref(cuts[startAt]!.index),
+    settles: settled ? range.ref(cuts[settleAt]!.index) : null
+  })
+}
+
+/**
  * Visible change inside `box` (source pixels, fixed on screen) over `range`. Decodes the range once
  * (and the frame before it), at a size chosen from the box, keeping only the box and its ring.
  */
@@ -198,9 +267,11 @@ export const boxChange = (
   source: Source,
   range: FrameRange,
   box: Box,
-  name = "box"
+  options: { readonly name?: string; readonly within?: Within } = {}
 ): Effect.Effect<BoxChange, KymoError> =>
   Effect.gen(function* () {
+    const name = options.name ?? "box"
+    const within = options.within ?? DEFAULT_WITHIN
     const size = yield* sizeOf(source)
     const from = Math.max(0, range.first - 1)
     const indices = Array.from({ length: range.last - from + 1 }, (_, k) => frameIndex(from + k))
@@ -215,26 +286,24 @@ export const boxChange = (
     const pairs = cuts.slice(1).map((c, k) => [cuts[k]!.cut, c.cut] as const)
     const rule = ruleOf(pairs, scale)
     const frames = cuts.slice(1).map((c, k) => frameChange(c.index, cuts[k]!.cut, c.cut, rule))
-    const inRange = cuts.filter((c) => c.index >= range.first)
-    const first = inRange[0]!.cut
-    const last = inRange[inRange.length - 1]!.cut
-    const differs = (a: Cut, b: Cut) => isVisible(visibleChange(a.patch, b.patch, b.inner, rule))
-    const startAt = inRange.findIndex((c) => differs(first, c.cut))
-    const stillAtEnd = frames.length === 0 || !frames[frames.length - 1]!.visible
-    let settleAt = inRange.length - 1
-    while (settleAt > 0 && !differs(inRange[settleAt - 1]!.cut, last)) settleAt--
     const inside = frames.filter((f) => f.index >= range.first)
     const samples: Array<number | null> = Array.from({ length: range.frameCount }, () => null)
     for (const f of inside) samples[f.index] = f.changedFraction
     return {
       box,
       floor: rule.floor,
+      within,
       frames: inside,
       track: { name: `${name}.change`, unit: "0..1", samples },
       changing: runs(range, inside, (f) => f.visible),
       discounted: runs(range, inside, (f) => f.discounted),
-      starts: startAt < 0 ? undefined : range.ref(inRange[startAt]!.index),
-      settles: stillAtEnd ? range.ref(inRange[settleAt]!.index) : undefined
+      timing: timingOf(
+        range,
+        cuts.filter((c) => c.index >= range.first),
+        rule,
+        within.px * scale,
+        within
+      )
     }
   })
 

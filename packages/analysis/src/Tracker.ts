@@ -10,7 +10,7 @@ import {
 } from "@kymo/core"
 import { Effect, Result, Schema, Stream } from "effect"
 import { cutPatch } from "./Change.ts"
-import { type Pose, type Template, cutTemplate, score, search } from "./Match.ts"
+import { type Pose, type Template, cutTemplate, fadeAt, score, search } from "./Match.ts"
 import { type Plane, planeOf, pyramid } from "./Plane.ts"
 import type { FrameRange } from "./Range.ts"
 import { round } from "./Stats.ts"
@@ -82,6 +82,11 @@ export const RegionTrack = Schema.Struct({
    * lost past the frame edge or to something unlike it.
    */
   opacity: Track,
+  /**
+   * `<name>.opacityNoise`: one standard error of each opacity sample, from how well the subject's
+   * pixels agree on it; null where opacity is null or the subject has no structure to fit.
+   */
+  opacityNoise: Schema.optionalKey(Track),
   /** Where position samples are null, and why; in frame order. */
   lost: Schema.Array(LostSpan)
 })
@@ -131,6 +136,8 @@ interface Model {
   readonly radius: number
   /** How far (level-0 pixels) a match may land from the prediction and still count as expected. */
   readonly near: number
+  /** Level-0 pixels of surroundings around the box in the template, on each side. */
+  readonly pad: number
 }
 
 interface State {
@@ -146,14 +153,37 @@ interface State {
 }
 
 type Step =
-  | { readonly _tag: "found"; readonly pose: Pose; readonly q: number; readonly gain: number }
+  | { readonly _tag: "found"; readonly pose: Pose; readonly q: number; readonly fade: Opacity }
   | {
       readonly _tag: "lost"
       readonly q: number
       readonly reason: LostReason
       /** The subject's contrast where it was last seen, when it faded there; else unknown. */
-      readonly gain: number | null
+      readonly fade: Opacity | null
     }
+
+/** A measured opacity and its standard error; null error when the subject has no structure to fit. */
+interface Opacity {
+  readonly opacity: number
+  readonly noise: number | null
+}
+
+/**
+ * Encoder noise on a still picture, grey levels (one deviation): about half of `VISIBLE_STEP`, the
+ * change H.264 leaves behind. The robust opacity fit never assumes pixels agree more closely than this.
+ */
+const PIXEL_NOISE = VISIBLE_STEP / 2
+
+/**
+ * The subject's opacity at `pose`, from its own pixels: the template's margin is the page around it,
+ * which a scrim may dim while the subject does not fade. A subject with no structure inside its box
+ * (a flat panel) has only its edges against the page, so then the margin is kept.
+ */
+const opacityAt = (model: Model, plane: Plane, pose: Pose): Opacity => {
+  const t = model.templates[0]!
+  const f = fadeAt(plane, t, pose, PIXEL_NOISE, model.pad) ?? fadeAt(plane, t, pose, PIXEL_NOISE, 0)
+  return f === undefined ? { opacity: score(plane, t, pose).gain, noise: null } : f
+}
 
 /** The subject's box at `pose`, in level-0 pixels. */
 const rectAt = (model: Model, box: Box, pose: Pose) => {
@@ -214,8 +244,7 @@ const step = (model: Model, state: State, levels: ReadonlyArray<Plane>): Step =>
     state.held = levels[0]
     state.missed = 0
     state.reason = undefined
-    const at = s === found.pose.s ? found.score : score(levels[0]!, model.templates[0]!, next)
-    return { _tag: "found", pose: next, q: found.score.q, gain: at.gain }
+    return { _tag: "found", pose: next, q: found.score.q, fade: opacityAt(model, levels[0]!, next) }
   }
   state.missed = missed + 1
   state.held = undefined
@@ -224,7 +253,7 @@ const step = (model: Model, state: State, levels: ReadonlyArray<Plane>): Step =>
     _tag: "lost",
     q: found?.score.q ?? 0,
     reason: state.reason,
-    gain: state.reason === "faded" ? score(levels[0]!, model.templates[0]!, pose).gain : null
+    fade: state.reason === "faded" ? opacityAt(model, levels[0]!, pose) : null
   }
 }
 
@@ -275,7 +304,8 @@ const modelOf = (base: Plane, box: Box, size: Size): { model: Model; start: Pose
       sx,
       sy,
       radius: Math.max(6, 0.5 * Math.max(tw, th)),
-      near: Math.max(3, 0.15 * Math.max(tw, th))
+      near: Math.max(3, 0.15 * Math.max(tw, th)),
+      pad
     },
     start: { cx, cy, s: 1 }
   }
@@ -345,13 +375,18 @@ export const trackRegion = (
 
     const [first] = yield* read([frameIndex(anchor)])
     const { model, start } = modelOf(planeOf(first!.image), box, size)
-    const record = (index: number, pose: Pose, q: number, gain: number) => {
+    const ns = nulls()
+    const recordOpacity = (index: number, fade: Opacity | null) => {
+      os[index] = fade === null ? null : round(Math.max(0, fade.opacity), 3)
+      ns[index] = fade?.noise == null ? null : round(fade.noise, 4)
+    }
+    const record = (index: number, pose: Pose, q: number, fade: Opacity) => {
       xs[index] = round(pose.cx / model.sx - (pose.s * box.w) / 2, 2)
       ys[index] = round(pose.cy / model.sy - (pose.s * box.h) / 2, 2)
       ws[index] = round(pose.s * box.w, 2)
       hs[index] = round(pose.s * box.h, 2)
       qs[index] = round(q, 3)
-      os[index] = round(Math.max(0, gain), 2)
+      recordOpacity(index, fade)
     }
     xs[anchor] = round(box.x, 2)
     ys[anchor] = round(box.y, 2)
@@ -359,6 +394,7 @@ export const trackRegion = (
     hs[anchor] = round(box.h, 2)
     qs[anchor] = 1
     os[anchor] = 1
+    ns[anchor] = 0
 
     const follow = (state: State, index: number, base: Plane) => {
       if (state.held !== undefined && unchanged(model, box, state.held, base, state.pose)) {
@@ -367,15 +403,15 @@ export const trackRegion = (
         if (at.q >= LOST) {
           state.vx = 0
           state.vy = 0
-          record(index, state.pose, at.q, at.gain)
+          record(index, state.pose, at.q, opacityAt(model, base, state.pose))
           return
         }
       }
       const r = step(model, state, pyramid(base, model.levels))
-      if (r._tag === "found") record(index, r.pose, r.q, r.gain)
+      if (r._tag === "found") record(index, r.pose, r.q, r.fade)
       else {
         qs[index] = round(r.q, 3)
-        os[index] = r.gain === null ? null : round(Math.max(0, r.gain), 2)
+        recordOpacity(index, r.fade)
         reasons[index] = r.reason
       }
     }
@@ -405,6 +441,7 @@ export const trackRegion = (
       h: { name: `${name}.h`, unit: "px", samples: hs },
       confidence: { name: `${name}.confidence`, unit: "0..1", samples: qs },
       opacity: { name: `${name}.opacity`, unit: "ratio", samples: os },
+      opacityNoise: { name: `${name}.opacityNoise`, unit: "ratio", samples: ns },
       lost: lostSpans(range, reasons)
     }
   })
