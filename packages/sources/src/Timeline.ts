@@ -50,7 +50,8 @@ export const makeTimeline = (f: TimelineFields): Timeline => {
     live: false,
     vfr: f.clock !== undefined,
     tracks: (f.tracks ?? []).map(({ name, unit }) => ({ name, unit })),
-    markers: f.markers ?? []
+    markers: f.markers ?? [],
+    offset: 0
   }
 }
 

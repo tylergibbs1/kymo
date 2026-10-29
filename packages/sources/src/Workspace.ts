@@ -42,7 +42,7 @@ export interface Detected {
 export const WorkspaceEntry = Schema.Struct({
   handle: Handle,
   input: Schema.String,
-  /** Frames to shift this source by when aligning it with others (e.g. telemetry). */
+  /** Frames this source runs late against others; `open` puts it on the Timeline, where compare reads it. */
   offset: Schema.Int,
   /** Markers the agent set; they appear on the opened Timeline with origin "agent". */
   markers: Schema.Array(AgentMarker)
@@ -77,7 +77,7 @@ export class Workspace extends Context.Service<
     readonly list: Effect.Effect<ReadonlyArray<WorkspaceEntry>, KymoError>
     /** A known handle → its input. Otherwise a path, URL or spec, under its existing or next auto handle. */
     resolve(sourceOrHandle: string): Effect.Effect<Resolved, KymoError>
-    /** Resolve and open, remembering new inputs and adding the agent's markers to the Timeline. */
+    /** Resolve and open, remembering new inputs and adding the agent's markers and offset to the Timeline. */
     open(sourceOrHandle: string): Effect.Effect<Source, KymoError, Scope.Scope>
     setOffset(handle: string, frames: number): Effect.Effect<void, KymoError>
     /** Set (or move) an agent marker. The index must already be resolved against the source. */
@@ -243,7 +243,8 @@ const make = Effect.fnUntraced(function* (root: string) {
           ...source,
           timeline: {
             ...source.timeline,
-            markers: [...source.timeline.markers.filter((m) => !names.has(m.name)), ...agent]
+            markers: [...source.timeline.markers.filter((m) => !names.has(m.name)), ...agent],
+            offset: entry?.offset ?? 0
           }
         }
         const next = entry ? state : withEntry(state, { handle, input, offset: 0, markers: [] })

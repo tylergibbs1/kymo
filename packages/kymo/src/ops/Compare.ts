@@ -9,14 +9,14 @@ import { checkSyntax } from "../Frames.ts"
 import { FrameLabels } from "../FrameLabels.ts"
 import { define, jsonLines } from "../Operation.ts"
 import { OutputDir } from "../OutputDir.ts"
-import { allPairs, pairWarnings, resolvePairs } from "../Pairs.ts"
+import { allPairs, offsetOf, pairTitle, pairWarnings, resolvePairs } from "../Pairs.ts"
 import { Sheet, SheetFrame, toSheets } from "../Sheets.ts"
 
 const fields = {
   a: Source.annotate({ description: "The first source (before), e.g. a path or handle." }),
   b: Source.annotate({
     description:
-      "The second source (after), compared at the same moments: by index when both run at the same constant rate, else by time."
+      "The second source (after), compared at the same moments: by index when both run at the same constant rate, else by time. Each source's offset (open --offset) shifts which of its frames shows a moment."
   }),
   view: Schema.Literals(["side", "diff"])
     .annotate({
@@ -57,6 +57,10 @@ export const CompareOutput = Schema.Struct({
   a: Schema.String,
   b: Schema.String,
   view: Schema.Literals(["side", "diff"]),
+  offsets: Schema.Struct({ a: Schema.Int, b: Schema.Int }).annotate({
+    description:
+      "The offsets applied (open --offset): frames each source runs late. A's frame i was paired with B's frame i − offsets.a + offsets.b."
+  }),
   frames: Schema.Array(SheetFrame).annotate({ description: "A's frame of each pair, in order." }),
   bFrames: Schema.Array(SheetFrame).annotate({
     description: "B's frame of each pair, in B's own addresses; bFrames[k] shows the moment of frames[k]."
@@ -76,7 +80,8 @@ export const CompareOutput = Schema.Struct({
   }),
   warnings: Schema.optionalKey(
     Schema.Array(Schema.String).annotate({
-      description: "Why the comparison may mislead: different clocks, sizes or aspect ratios."
+      description:
+        "Why the comparison may mislead: different clocks, sizes or aspect ratios, or frames of A that B has no frame for (after offsets) and were left out."
     })
   ),
   next: Schema.NullOr(Cursor),
@@ -108,12 +113,12 @@ export const compare = define({
     const b = yield* workspace.open(input.b)
     const ta = a.timeline
     const tb = b.timeline
-    const pairs =
+    const { pairs, left } =
       "at" in input
-        ? yield* resolvePairs(ta, tb, input.at)
+        ? { pairs: yield* resolvePairs(ta, tb, input.at), left: undefined }
         : input.range !== undefined
-          ? yield* resolvePairs(ta, tb, [input.range])
-          : allPairs(ta, tb)
+          ? { pairs: yield* resolvePairs(ta, tb, [input.range]), left: undefined }
+          : yield* allPairs(ta, tb)
     yield* enforceFrameCap(
       pairs.length,
       input.uncapped,
@@ -139,16 +144,17 @@ export const compare = define({
       const address = Address.format(rate, index)
       return detailed ? { address, index, t: secondsAt(rate, index) } : { address, index }
     }
-    const warnings = pairWarnings(ta, tb)
+    const warnings = [...pairWarnings(ta, tb), ...(left === undefined ? [] : [left])]
     return {
       a: ta.handle,
       b: tb.handle,
       view: input.view,
+      offsets: { a: offsetOf(ta), b: offsetOf(tb) },
       frames: pairs.map((p) => ref(ta.rate, p.a)),
       bFrames: pairs.map((p) => ref(tb.rate, p.b)),
       sheets: toSheets(result.images, {
         timeline: ta,
-        who: `${ta.handle} vs ${tb.handle}`,
+        who: pairTitle(ta, tb),
         ...(input.view === "diff" ? { view: "diff" } : {}),
         format: input.format,
         labelStyle: style

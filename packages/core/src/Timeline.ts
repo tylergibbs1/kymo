@@ -68,7 +68,17 @@ export const Timeline = Schema.Struct({
   /** True when the source has a variable frame rate; `t` then comes from presentation timestamps. */
   vfr: Schema.Boolean,
   tracks: Schema.Array(TrackInfo),
-  markers: Schema.Array(Marker)
+  markers: Schema.Array(Marker),
+  /**
+   * Frames this source runs late against the sources it is compared with, set by `open --offset`:
+   * with offset 6, its frame 6 shows the moment an unshifted source shows at frame 0.
+   */
+  offset: Schema.optionalKey(
+    Schema.Int.annotate({
+      description:
+        "Frames this source runs late (set with open --offset): its frame N shows the moment an unshifted source shows at 0f. compare pairs frames through it."
+    })
+  )
 })
 export type Timeline = typeof Timeline.Type
 

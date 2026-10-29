@@ -39,7 +39,7 @@ On variable-frame-rate sources (`vfr: true`: phone and screen recordings, GIFs),
    - `pass` is false only for errors and failed assertions; read `counts` (or `label`, e.g. "Pass with 2 warnings, 0 errors, 0 info; …") for warnings too. On the CLI a check that does not pass exits 1, after printing its result.
    - With only `assert`, no lint rules run, so the verdict is the assertions'; add `rules` to run some too.
 5. Change the source (edit the animation, re-export the video).
-6. **compare** before and after at the same moments (`view=side` or `view=diff`), and rerun the same `check --assert` to prove the change. Sources at different frame rates are matched by time, each side labelled with its own address; prefix an address with B's handle (`clip2@20s`) to read it on B's clock. `summary.changed` counts pairs where more than 0.1% of pixels changed beyond encoding noise, so a small UI change counts; `warnings` says when clocks, sizes or shapes differ.
+6. **compare** before and after at the same moments (`view=side` or `view=diff`), and rerun the same `check --assert` to prove the change. Sources at different frame rates are matched by time, each side labelled with its own address; prefix an address with B's handle (`clip2@20s`) to read it on B's clock. When B starts later than A, `open B --offset N` (B runs N frames late) makes compare pair A's `0f` with B's `#N`; see [video](references/video.md#aligning-two-sources). `summary.changed` counts pairs where more than 0.1% of pixels changed beyond encoding noise, so a small UI change counts; `warnings` says when clocks, sizes or shapes differ.
 
 ## When does it start, and when does it settle?
 

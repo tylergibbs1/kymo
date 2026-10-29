@@ -16,6 +16,18 @@ Video needs `ffmpeg` and `ffprobe` on `PATH`, or `KYMO_FFMPEG` and `KYMO_FFPROBE
 
 The first call on a path gives it a handle (`clip1`, `clip2`, …), remembered in `.kymo/handles.json` under the current directory. Pass the handle afterwards instead of the path. `kymo open clip.mp4 --as hero` or `kymo probe clip.mp4 --as hero` picks the name yourself. A name that already belongs to another source is refused, so its markers are never lost by accident; pass `--replace` to rebind it on purpose (its markers are dropped). Naming the same source again changes nothing.
 
+## Aligning two sources
+
+When one source starts later than another (a re-record, telemetry, a second camera), tell kymo once and `compare` pairs the same moments:
+
+```sh
+kymo open before.mp4 --as before
+kymo open after.mp4 --as after --offset 6     # after runs 6 frames late
+kymo compare before after --view diff          # before@0f is paired with after's #6
+```
+
+`--offset N` says the source runs N frames late: its frame N shows what an unshifted source shows at `0f`. A source that runs early takes a negative offset; `--offset 0` clears it. It is counted in the source's own frames (at its average rate when the rate is variable), stored with the handle, and shown by `probe` and `open`. `compare` applies both sides' offsets: A's frame `i` is paired with B's frame `i − offsetA + offsetB`, so an address names the same moment on both, and `B@…` addresses map back the same way. Its output lists the `offsets` applied, and the sheet label names them (`clip1 vs clip2 (clip2 +6f)`). Without `at` or `range`, frames of A that the shift leaves without a B frame are listed in `warnings`; an address shifted past B's ends fails with the range both sources share.
+
 ## Variable frame rate
 
 Phone and screen recordings are often variable frame rate, and animated GIFs and WebPs with uneven frame delays are too. `probe` reports `vfr: true`, the average rate as `fps`, and the real length as `durationSeconds` and `duration` (`32.48s`). On these sources seconds are real time and frames are decoded frames:
