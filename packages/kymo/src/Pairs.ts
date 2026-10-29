@@ -58,20 +58,20 @@ const partner = (from: Timeline, to: Timeline, index: number): number => {
 const inside = (t: Timeline, index: number): boolean => index >= 0 && index < t.frameCount
 
 /** `0f..05f`, or one address when the run is one frame. */
-const span = (t: Timeline, first: number, last: number): string =>
+const span = (t: Timeline, first: number, last: number, style: Address.LabelStyle): string =>
   first === last
-    ? Address.format(t.rate, first)
-    : `${Address.format(t.rate, first)}..${Address.format(t.rate, last)}`
+    ? Address.styledAddress(t.rate, first, style)
+    : Address.styledSpan(t.rate, first, last, style)
 
 /** Contiguous runs of indices on `t`'s clock, e.g. `0f..05f, 01s10f`. */
-const spans = (t: Timeline, indices: ReadonlyArray<number>): string => {
+const spans = (t: Timeline, indices: ReadonlyArray<number>, style: Address.LabelStyle): string => {
   const runs: Array<[number, number]> = []
   for (const i of indices) {
     const last = runs.at(-1)
     if (last !== undefined && last[1] === i - 1) last[1] = i
     else runs.push([i, i])
   }
-  return runs.map(([x, y]) => span(t, x, y)).join(", ")
+  return runs.map(([x, y]) => span(t, x, y, style)).join(", ")
 }
 
 /** Which offsets moved the pairing, for messages: "" when neither source has one. */
@@ -83,12 +83,12 @@ const shiftedBy = (a: Timeline, b: Timeline): string => {
 }
 
 /** The frames of `anchor` that `other` has a frame for, as a range on `anchor`'s clock. */
-const overlap = (anchor: Timeline, other: Timeline): string | undefined => {
+const overlap = (anchor: Timeline, other: Timeline, style: Address.LabelStyle): string | undefined => {
   const both: Array<number> = []
   for (let i = 0; i < anchor.frameCount; i++) if (inside(other, partner(anchor, other, i))) both.push(i)
   const [first, last] = [both[0], both.at(-1)]
   if (first === undefined || last === undefined) return undefined
-  return span(anchor, first, last)
+  return span(anchor, first, last, style)
 }
 
 /** The frame of `to` on screen when frame `index` of `from` is, failing when `to` has no frame then. */
@@ -96,18 +96,19 @@ const sameMoment = (
   from: Timeline,
   to: Timeline,
   index: number,
-  text: string
+  text: string,
+  style: Address.LabelStyle
 ): Effect.Effect<FrameIndex, AddressOutOfRange> => {
   const other = partner(from, to, index)
   if (inside(to, other)) return Effect.succeed(frameIndex(other))
   const shift = shiftedBy(from, to)
-  const both = overlap(from, to)
+  const both = overlap(from, to, style)
   return Effect.fail(
     new AddressOutOfRange({
       message:
         shift === ""
-          ? `${text} is ${Address.format(from.rate, index)} on ${from.handle} (${seconds(secondsAt(from.rate, index))}), but ${to.handle} is ${seconds(to.durationSeconds)} long.`
-          : `${text} is ${Address.format(from.rate, index)} on ${from.handle}${shift}, which would be ${to.handle}'s frame #${other}, but ${to.handle} has frames #0 to #${to.frameCount - 1}.`,
+          ? `${text} is ${Address.styledAddress(from.rate, index, style)} on ${from.handle} (${seconds(secondsAt(from.rate, index))}), but ${to.handle} is ${seconds(to.durationSeconds)} long.`
+          : `${text} is ${Address.styledAddress(from.rate, index, style)} on ${from.handle}${shift}, which would be ${to.handle}'s frame #${other}, but ${to.handle} has frames #0 to #${to.frameCount - 1}.`,
       hint:
         both === undefined
           ? `${from.handle} and ${to.handle} share no moment${shift}; check the offsets with probe, or set them again with kymo open --offset.`
@@ -116,7 +117,12 @@ const sameMoment = (
   )
 }
 /** One address on whichever source it names, as pairs. */
-const pairsOf = (a: Timeline, b: Timeline, text: string): Effect.Effect<Array<FramePair>, KymoError> =>
+const pairsOf = (
+  a: Timeline,
+  b: Timeline,
+  text: string,
+  style: Address.LabelStyle
+): Effect.Effect<Array<FramePair>, KymoError> =>
   Effect.gen(function* () {
     const address = yield* Address.parseEffect(text)
     const onB = address.handle !== undefined && address.handle === b.handle && address.handle !== a.handle
@@ -128,7 +134,7 @@ const pairsOf = (a: Timeline, b: Timeline, text: string): Effect.Effect<Array<Fr
     const [anchor, other] = onB ? [b, a] : [a, b]
     const indices = yield* Effect.fromResult(Address.resolve(resolveContext(anchor), address))
     return yield* Effect.forEach(indices, (i) =>
-      Effect.map(sameMoment(anchor, other, i, text), (j) => (onB ? { a: j, b: i } : { a: i, b: j }))
+      Effect.map(sameMoment(anchor, other, i, text, style), (j) => (onB ? { a: j, b: i } : { a: i, b: j }))
     )
   })
 
@@ -136,10 +142,11 @@ const pairsOf = (a: Timeline, b: Timeline, text: string): Effect.Effect<Array<Fr
 export const resolvePairs = (
   a: Timeline,
   b: Timeline,
-  texts: ReadonlyArray<string>
+  texts: ReadonlyArray<string>,
+  style: Address.LabelStyle
 ): Effect.Effect<ReadonlyArray<FramePair>, KymoError> =>
   Effect.map(
-    Effect.forEach(texts, (text) => pairsOf(a, b, text)),
+    Effect.forEach(texts, (text) => pairsOf(a, b, text, style)),
     (lists) => {
       const unique = new Map(lists.flat().map((p) => [`${p.a}:${p.b}`, p]))
       return [...unique.values()].sort((x, y) => x.a - y.a || x.b - y.b)
@@ -149,7 +156,8 @@ export const resolvePairs = (
 /** Every frame of A that B also has a frame for, paired, and a warning naming A's frames left out. */
 export const allPairs = (
   a: Timeline,
-  b: Timeline
+  b: Timeline,
+  style: Address.LabelStyle
 ): Effect.Effect<
   { readonly pairs: ReadonlyArray<FramePair>; readonly left: string | undefined },
   AddressOutOfRange
@@ -172,7 +180,7 @@ export const allPairs = (
   const left =
     unpaired.length === 0
       ? undefined
-      : `${a.handle} ${spans(a, unpaired)} (${unpaired.length} frame${unpaired.length === 1 ? "" : "s"}) ha${unpaired.length === 1 ? "s" : "ve"} no ${b.handle} frame at the same moment${shift}, so ${unpaired.length === 1 ? "it was" : "they were"} not compared.`
+      : `${a.handle} ${spans(a, unpaired, style)} (${unpaired.length} frame${unpaired.length === 1 ? "" : "s"}) ha${unpaired.length === 1 ? "s" : "ve"} no ${b.handle} frame at the same moment${shift}, so ${unpaired.length === 1 ? "it was" : "they were"} not compared.`
   return Effect.succeed({ pairs, left })
 }
 

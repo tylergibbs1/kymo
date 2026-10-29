@@ -115,10 +115,10 @@ export const compare = define({
     const tb = b.timeline
     const { pairs, left } =
       "at" in input
-        ? { pairs: yield* resolvePairs(ta, tb, input.at), left: undefined }
+        ? { pairs: yield* resolvePairs(ta, tb, input.at, style), left: undefined }
         : input.range !== undefined
-          ? { pairs: yield* resolvePairs(ta, tb, [input.range]), left: undefined }
-          : yield* allPairs(ta, tb)
+          ? { pairs: yield* resolvePairs(ta, tb, [input.range], style), left: undefined }
+          : yield* allPairs(ta, tb, style)
     yield* enforceFrameCap(
       pairs.length,
       input.uncapped,

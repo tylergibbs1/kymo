@@ -5,7 +5,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { compare, open, probe } from "kymo"
 import { Effect } from "effect"
-import { call, failure, fresh } from "./harness.ts"
+import { call, failure, fresh, freshStyled } from "./harness.ts"
 
 /** The same linear move, B starting it 6 frames later: B's frame i + 6 shows A's frame i. */
 const A = "synthetic:ease?easing=linear&frames=60&start=10&end=40"
@@ -31,6 +31,17 @@ describe("compare with an offset", () => {
           `${a.handle} 01s24f..01s29f (6 frames) have no ${b.handle} frame at the same moment with ${b.handle}'s offset of +6f, so they were not compared.`
         ])
       }).pipe(Effect.provide(fresh))
+  )
+
+  it.effect("the warning names the frames left out in the label style, so index style says #54..#59", () =>
+    Effect.gen(function* () {
+      const a = yield* call(open, { src: A })
+      const b = yield* call(open, { src: B, offset: DELAY })
+      const out = yield* call(compare, { a: a.handle, b: b.handle, view: "diff" })
+      expect(out.warnings).toEqual([
+        `${a.handle} #54..#59 (6 frames) have no ${b.handle} frame at the same moment with ${b.handle}'s offset of +6f, so they were not compared.`
+      ])
+    }).pipe(Effect.provide(freshStyled("index")))
   )
 
   it.effect("a zero offset pairs by index, so the delay shows as a difference", () =>

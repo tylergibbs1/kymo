@@ -8,6 +8,7 @@ import {
   kymoLayer,
   operations
 } from "kymo"
+import { Address } from "@kymo/core"
 import { Effect, Layer, Schema } from "effect"
 import { execFileSync } from "node:child_process"
 import { mkdtempSync, rmSync } from "node:fs"
@@ -16,16 +17,20 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import sharp from "sharp"
 
-/** A fresh workspace root and image directory per test, removed afterwards. */
-export const fresh = Layer.unwrap(
-  Effect.map(
-    Effect.acquireRelease(
-      Effect.promise(() => mkdtemp(join(tmpdir(), "kymo-ops-"))),
-      (dir) => Effect.promise(() => rm(dir, { recursive: true, force: true }))
-    ),
-    (dir) => kymoLayer({ root: dir, out: join(dir, "out") })
+/** A fresh workspace root and image directory per test, removed afterwards, labelling frames in `labelStyle`. */
+export const freshStyled = (labelStyle: Address.LabelStyle) =>
+  Layer.unwrap(
+    Effect.map(
+      Effect.acquireRelease(
+        Effect.promise(() => mkdtemp(join(tmpdir(), "kymo-ops-"))),
+        (dir) => Effect.promise(() => rm(dir, { recursive: true, force: true }))
+      ),
+      (dir) => kymoLayer({ root: dir, out: join(dir, "out"), labelStyle })
+    )
   )
-)
+
+/** A fresh workspace with the default label style. */
+export const fresh = freshStyled(Address.DEFAULT_LABEL_STYLE)
 
 type Codec = Schema.Codec<unknown, unknown, never, never>
 
