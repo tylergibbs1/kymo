@@ -1,6 +1,7 @@
 import { FrameRef, Marker, fpsOf } from "@kymo/core"
 import { Schema } from "effect"
 import { isOverlay } from "./Overlay.ts"
+import { VISIBLE_STEP } from "./Visible.ts"
 import { type Gray, histogramDistance, meanAbsDiff } from "./Pixels.ts"
 import type { Scan } from "./Scan.ts"
 import { signals } from "./Signals.ts"
@@ -73,6 +74,8 @@ const FLASH_RETURN = 2
 const FLASH_MAX_SECONDS = 1 / 15
 /** A flash starts or ends at once: the frame next to it is at least this far (as a share) from its picture as the one beyond. */
 const FLASH_SUDDEN = 0.8
+/** ...and changes the picture as a whole by a visible step on average: a spinner turning does not flash. */
+const FLASH_VISIBLE = VISIBLE_STEP / 255
 /** How much a still picture may add to the way between two others, as a share of it, and still lie between them. */
 const BETWEEN_MARGIN = 0.25
 
@@ -99,7 +102,7 @@ const coarseFloor = (scan: Scan, coarse: ReadonlyArray<number>): number => {
  * Flashes (a white frame, a glitch) belong to neither shot: for a moment the picture is something
  * else, then it returns. Each is a run of at most `FLASH_MAX_SECONDS` whose every frame differs from
  * the frames on both sides of it by `FLASH_RETURN` times as much as those two differ from each other,
- * and that starts or ends at once rather than being approached.
+ * that starts or ends at once rather than being approached, and that changes the whole picture visibly.
  * Runs are scan positions, both ends included; one-frame runs are tried first.
  */
 export const flashRuns = (scan: Scan): Array<readonly [number, number]> => {
@@ -118,7 +121,7 @@ export const flashRuns = (scan: Scan): Array<readonly [number, number]> => {
         k < 2 ? 1 : ratio(d(k - 1, k), d(k - 2, k)),
         k + n + 1 >= f.length ? 1 : ratio(d(k + n - 1, k + n), d(k + n - 1, k + n + 1))
       )
-      if (away > 0 && FLASH_RETURN * d(k - 1, k + n) < away && sudden >= FLASH_SUDDEN) {
+      if (away >= FLASH_VISIBLE && FLASH_RETURN * d(k - 1, k + n) < away && sudden >= FLASH_SUDDEN) {
         out.push([k, k + n - 1])
         k += n
         break

@@ -1,6 +1,6 @@
 export { FrameRange, frameRef } from "./Range.ts"
 export { type FrameStat, type Scan, SCAN_MAX_EDGE, scan } from "./Scan.ts"
-export { Cut, Cuts, detectCuts } from "./Cuts.ts"
+export { Cut, Cuts, detectCuts, flashRuns } from "./Cuts.ts"
 export {
   CHANGED_FRACTION,
   FrameDifference,

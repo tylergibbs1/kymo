@@ -6,6 +6,7 @@ import {
   type Motion,
   SampleStrategy,
   detectCuts,
+  flashRuns,
   motionEnergy,
   sample,
   scan as scanFrames
@@ -70,6 +71,13 @@ export const ScanCut = Schema.Struct({
   score: Schema.Number.annotate({ description: "Histogram distance across the transition, 0..1." })
 })
 
+export const ScanFlash = Schema.Struct({
+  from: Schema.String.annotate({ description: "First frame of the flash." }),
+  to: Schema.String.annotate({
+    description: "Last frame of the flash; the same as from for a one-frame flash."
+  })
+})
+
 export const Suggestion = Schema.Struct({
   range: Schema.String.annotate({ description: "Ready to pass as `range` to frames, scan, track or check." }),
   reason: Schema.String.annotate({ description: "Why this range is worth a look." })
@@ -101,6 +109,10 @@ export const ScanOutput = Schema.Struct({
     )
   }).annotate({ description: "Motion-energy summary." }),
   cuts: Schema.Array(ScanCut).annotate({ description: "Detected cuts and fades, in time order." }),
+  flashes: Schema.Array(ScanFlash).annotate({
+    description:
+      "Flashes, in time order: a frame (or up to 1/15 s of frames) unlike the frames on both sides of it, such as a white flash, after which the picture returns. They are not cuts, and do not split or end one; check --rules flicker rates them."
+  }),
   suggestions: Schema.Array(Suggestion).annotate({ description: "Ranges worth a closer look, best first." }),
   next: Schema.NullOr(Cursor),
   note: Schema.optionalKey(Schema.String.annotate({ description: "What was left out and how to get it." }))
@@ -229,6 +241,10 @@ export const scan = define({
         to: c.to.address,
         incoming: c.incoming.address,
         score: c.score
+      })),
+      flashes: flashRuns(stats).map(([a, b]) => ({
+        from: range.ref(stats.frames[a]!.index).address,
+        to: range.ref(stats.frames[b]!.index).address
       })),
       suggestions,
       next: result.next,

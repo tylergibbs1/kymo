@@ -201,6 +201,16 @@ describe("frames", () => {
 })
 
 describe("scan", () => {
+  it.effect("names a flash apart from the cuts, so it is not mistaken for one", () =>
+    Effect.gen(function* () {
+      const out = yield* call(scan, { source: "synthetic:flicker?at=40&gain=120", budget: 6 })
+      expect(out.cuts).toEqual([])
+      expect(out.flashes).toEqual([{ from: "01s10f", to: "01s10f" }])
+      const bounce = yield* call(scan, { source: BOUNCE, budget: 6 })
+      expect(bounce.flashes).toEqual([])
+    }).pipe(Effect.provide(fresh))
+  )
+
   it.effect("samples within budget, summarises motion and suggests ranges frames accepts", () =>
     Effect.gen(function* () {
       const out = yield* call(scan, { source: BOUNCE, budget: 8 })
