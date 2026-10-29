@@ -6,10 +6,11 @@ Run on 2026-10-28. The full run directories are under `eval/reports/runs/` and a
 
 ## Overall
 
-| kymo                 | Dev         | Held out    | All         |
-| -------------------- | ----------- | ----------- | ----------- |
-| Before round-2 fixes | 24/50 (48%) | 21/37 (57%) | 45/87 (52%) |
-| After round-2 fixes  | 34/50 (68%) | 30/37 (81%) | 64/87 (74%) |
+| kymo                 | Dev          | Held out    | All         |
+| -------------------- | ------------ | ----------- | ----------- |
+| Before round-2 fixes | 24/50 (48%)  | 21/37 (57%) | 45/87 (52%) |
+| After round-2 fixes  | 34/50 (68%)  | 30/37 (81%) | 64/87 (74%) |
+| After round-3 fixes  | 50/50 (100%) | 36/37 (97%) | 86/87 (99%) |
 
 ## By question type
 
@@ -29,7 +30,11 @@ Run on 2026-10-28. The full run directories are under `eval/reports/runs/` and a
 
 The "after" run allows half a pixel of tracker jitter before calling a tracked box still moving at the last frame. The new tracker's height alternates by 0.06 px at rest, and without that slack `ui-compare-delayed` reads as never settling. The "before" run used the exact check; it changes no "before" result.
 
-## What still fails, and why
+## After round 3
+
+Round 3 added change inside a box (`track --props change`), opacity, fixed-scale diff numbers and still trackers, and fixed dropped frames after a hold, flashes read as cuts, and overlays read as cuts. Every family now passes except one `ui-start` task: `ui-snackbar-pulse-start` answers #39 against #35, because the box where the snackbar comes to rest does not contain the path it enters along, so its first frames happen outside the box. The sections below describe the state after round 2.
+
+## What still fails after round 2, and why
 
 ### Entrances with no box at 0f (`ui-start`, `ui-settle`): 19 misses
 
